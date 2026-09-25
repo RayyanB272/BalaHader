@@ -1,0 +1,24 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+server/.venv/
+server/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+client/node_modules/
+client/dist/
+npm-debug.log*
+
+# Editors
+.vscode/
+.idea/
+
+# Operating system
+.DS_Store
+Thumbs.db
