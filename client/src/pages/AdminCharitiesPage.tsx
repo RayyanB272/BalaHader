@@ -1,18 +1,22 @@
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react";
 import DashboardShell from "../components/layout/DashboardShell";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import ErrorState from "../components/ui/ErrorState";
 import EmptyState from "../components/ui/EmptyState";
+import MetricCard from "../components/ui/MetricCard";
 import {
-  getPendingCharities,
+  getAdminCharities,
   rejectCharity,
   verifyCharity,
-  type PendingCharity,
+  type AdminCharity,
 } from "../services/adminCharityService";
 
 export default function AdminCharitiesPage() {
-  const [charities, setCharities] = useState<PendingCharity[]>([]);
+  const [charities, setCharities] = useState<AdminCharity[]>([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -24,7 +28,7 @@ export default function AdminCharitiesPage() {
     setLoadError(false);
 
     try {
-      setCharities(await getPendingCharities());
+      setCharities(await getAdminCharities());
     } catch {
       setLoadError(true);
     } finally {
@@ -36,19 +40,10 @@ export default function AdminCharitiesPage() {
     void loadCharities();
   }, []);
 
-  function removeCharity(charityId: string) {
-    setCharities((currentCharities) =>
-      currentCharities.filter(
-        (charity) => charity._id !== charityId
-      )
-    );
-
-    setReasons((currentReasons) => {
-      const nextReasons = { ...currentReasons };
-      delete nextReasons[charityId];
-      return nextReasons;
-    });
-  }
+  const filteredCharities = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return charities.filter((charity) => (statusFilter === "all" || charity.verification_status === statusFilter) && (!query || [charity.organization_name, charity.area, charity.phone, charity.address].join(" ").toLowerCase().includes(query)));
+  }, [charities, search, statusFilter]);
 
   async function handleAction(
     charityId: string,
@@ -73,7 +68,12 @@ export default function AdminCharitiesPage() {
         await rejectCharity(charityId, reason);
       }
 
-      removeCharity(charityId);
+      setCharities((current) => current.map((charity) => charity._id === charityId ? {
+        ...charity,
+        verification_status: action === "verify" ? "verified" : "rejected",
+        verification_reason: reason,
+        verified_at: new Date().toISOString(),
+      } : charity));
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const message = error.response?.data?.detail;
@@ -99,6 +99,16 @@ export default function AdminCharitiesPage() {
       title="Charity verification"
       description="Review charity applications before allowing donation claims."
     >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <MetricCard icon={<ShieldCheck size={21} />} label="All charities" value={charities.length} />
+        <MetricCard icon={<Clock3 size={21} />} label="Pending review" value={charities.filter((charity) => charity.verification_status === "pending").length} />
+        <MetricCard icon={<CheckCircle2 size={21} />} label="Verified" value={charities.filter((charity) => charity.verification_status === "verified").length} />
+      </div>
+
+      <section className="grid gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search charities..." aria-label="Search charities" className="rounded-xl border border-[#EEDFD3] px-4 py-3 text-sm outline-none focus:border-[#E85D3F]" />
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter charities by verification status" className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-3 text-sm"><option value="all">All statuses</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select>
+      </section>
       {actionError && (
         <div
           role="alert"
@@ -112,19 +122,19 @@ export default function AdminCharitiesPage() {
         <LoadingSpinner />
       ) : loadError ? (
         <ErrorState
-          message="We couldn't load pending charity applications."
+          message="We couldn't load charity accounts."
           onRetry={() => void loadCharities()}
         />
-      ) : charities.length === 0 ? (
+      ) : filteredCharities.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No pending applications"
-            description="New charity verification requests will appear here."
+            title={charities.length ? "No matching charities" : "No charity accounts"}
+            description={charities.length ? "Try another search or status." : "Registered charities will appear here."}
           />
         </section>
       ) : (
         <div className="space-y-5">
-          {charities.map((charity) => (
+          {filteredCharities.map((charity) => (
             <article
               key={charity._id}
               className="rounded-2xl border border-[#EEDFD3] bg-white p-6 shadow-sm"
@@ -136,8 +146,8 @@ export default function AdminCharitiesPage() {
                       {charity.organization_name}
                     </h2>
 
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                      Pending
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${charity.verification_status === "verified" ? "bg-green-100 text-green-800" : charity.verification_status === "rejected" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
+                      {charity.verification_status}
                     </span>
                   </div>
 
@@ -204,7 +214,7 @@ export default function AdminCharitiesPage() {
                   </dl>
                 </div>
 
-                <div className="w-full rounded-2xl bg-[#FFF9EE] p-4 lg:max-w-sm">
+                {charity.verification_status === "pending" ? <div className="w-full rounded-2xl bg-[#FFF9EE] p-4 lg:max-w-sm">
                   <label
                     htmlFor={`reason-${charity._id}`}
                     className="block text-sm font-semibold text-[#3A2925]"
@@ -252,7 +262,11 @@ export default function AdminCharitiesPage() {
                         : "Verify"}
                     </button>
                   </div>
-                </div>
+                </div> : <div className={`w-full rounded-2xl border p-5 lg:max-w-sm ${charity.verification_status === "verified" ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+                  <div className="flex items-center gap-2">{charity.verification_status === "verified" ? <CheckCircle2 size={20} /> : <XCircle size={20} />}<h3 className="font-bold capitalize">{charity.verification_status}</h3></div>
+                  <p className="mt-3 text-sm">{charity.verification_reason || (charity.verification_status === "verified" ? "This charity has been approved." : "This charity was not approved.")}</p>
+                  {charity.verified_at && <p className="mt-3 text-xs opacity-75">Updated {new Date(charity.verified_at).toLocaleString()}</p>}
+                </div>}
               </div>
             </article>
           ))}

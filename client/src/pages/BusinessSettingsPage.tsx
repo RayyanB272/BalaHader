@@ -27,6 +27,7 @@ export default function BusinessSettingsPage() {
   });
 
   const [savingProfile, setSavingProfile] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
 
@@ -113,6 +114,7 @@ export default function BusinessSettingsPage() {
         });
 
       setProfile(updatedProfile);
+      setEditingProfile(false);
       setProfileSuccess(
         "Business profile updated successfully."
       );
@@ -241,7 +243,7 @@ export default function BusinessSettingsPage() {
                 </p>
 
                 <h2 className="mt-2 text-xl font-bold text-[#3A2925]">
-                  Edit your business information
+                  {editingProfile ? "Edit your business information" : "Business information"}
                 </h2>
               </div>
 
@@ -275,7 +277,7 @@ export default function BusinessSettingsPage() {
               </div>
             )}
 
-            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+            <fieldset disabled={!editingProfile} className="mt-6 grid gap-5 sm:grid-cols-2 disabled:[&_input]:cursor-default disabled:[&_input]:bg-[#FFF9EE] disabled:[&_input]:text-[#71605A] disabled:[&_textarea]:cursor-default disabled:[&_textarea]:bg-[#FFF9EE] disabled:[&_textarea]:text-[#71605A]">
               <div>
                 <label
                   htmlFor="business-name"
@@ -408,18 +410,40 @@ export default function BusinessSettingsPage() {
                   className="w-full resize-none rounded-xl border border-[#EEDFD3] px-4 py-3 outline-none focus:border-[#E85D3F]"
                 />
               </div>
-            </div>
+            </fieldset>
 
             <div className="mt-6 flex justify-end">
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="rounded-xl bg-[#E85D3F] px-5 py-3 text-sm font-semibold text-white hover:bg-[#C9472E] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingProfile
-                  ? "Saving..."
-                  : "Save business profile"}
-              </button>
+              {editingProfile ? (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={savingProfile}
+                    onClick={() => {
+                      setProfileForm({
+                        businessName: profile.business_name,
+                        businessType: profile.business_type,
+                        description: profile.description ?? "",
+                        phone: profile.phone,
+                        address: profile.address,
+                        area: profile.area,
+                      });
+                      setEditingProfile(false);
+                      setProfileError("");
+                      setProfileSuccess("");
+                    }}
+                    className="rounded-xl border border-[#EEDFD3] bg-white px-5 py-3 text-sm font-semibold text-[#3A2925] hover:border-[#E85D3F]"
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={savingProfile} className="rounded-xl bg-[#E85D3F] px-5 py-3 text-sm font-semibold text-white hover:bg-[#C9472E] disabled:cursor-not-allowed disabled:opacity-60">
+                    {savingProfile ? "Saving..." : "Save business profile"}
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => { setEditingProfile(true); setProfileError(""); setProfileSuccess(""); }} className="rounded-xl bg-[#E85D3F] px-5 py-3 text-sm font-semibold text-white hover:bg-[#C9472E]">
+                  Edit business profile
+                </button>
+              )}
             </div>
           </form>
 

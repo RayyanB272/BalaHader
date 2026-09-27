@@ -29,6 +29,13 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
+class UserUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
@@ -43,3 +50,5 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     role: str
+    first_name: str
+    last_name: str

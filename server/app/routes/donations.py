@@ -22,10 +22,37 @@ router = APIRouter(
 
 def serialize_donation(donation):
     donation["_id"] = str(donation["_id"])
-    if not donation.get("image_url") and ObjectId.is_valid(donation.get("listing_id", "")):
-        listing = listings_collection.find_one({"_id": ObjectId(donation["listing_id"])})
-        if listing:
-            donation["image_url"] = listing.get("image_url")
+    if not donation.get("image_url"):
+        listing = None
+        listing_id = donation.get("listing_id", "")
+
+        if ObjectId.is_valid(str(listing_id)):
+            listing = listings_collection.find_one({
+                "_id": ObjectId(str(listing_id))
+            })
+
+        # Support legacy donations that were created without a usable listing ID.
+        if not listing and donation.get("title"):
+            legacy_query = {"title": donation["title"]}
+            if donation.get("business_id"):
+                legacy_query["business_id"] = donation["business_id"]
+            listing = listings_collection.find_one(legacy_query)
+
+        # Older seed versions used a different business-id representation.
+        # The title-only lookup still restores the original listing image for
+        # those records.
+        if not listing and donation.get("title"):
+            listing = listings_collection.find_one(
+                {"title": donation["title"]},
+                sort=[("created_at", -1)]
+            )
+
+        if listing and listing.get("image_url"):
+            donation["image_url"] = listing["image_url"]
+            donations_collection.update_one(
+                {"_id": ObjectId(donation["_id"])},
+                {"$set": {"image_url": listing["image_url"]}}
+            )
     return donation
 
 

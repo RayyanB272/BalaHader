@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import PageFrame from "../components/layout/PageFrame";
 import { clearCart } from "../services/cartService";
-import { getOrder } from "../services/orderService";
+import { getCheckoutPayment, getOrder } from "../services/orderService";
 
 type Result = "checking" | "paid" | "failed" | "pending" | "error";
 
 export default function PaymentResultPage() {
   const [params] = useSearchParams();
   const orderId = params.get("order");
+  const checkoutId = params.get("checkout");
   const [result, setResult] = useState<Result>("checking");
 
   useEffect(() => {
-    if (!orderId) {
+    if (!orderId && !checkoutId) {
       setResult("error");
       return;
     }
@@ -22,7 +23,7 @@ export default function PaymentResultPage() {
 
     async function checkOrder() {
       try {
-        const order = await getOrder(orderId!);
+        const order = checkoutId ? await getCheckoutPayment(checkoutId) : await getOrder(orderId!);
         if (stopped) return;
 
         if (order.payment_status === "paid") {
@@ -31,7 +32,7 @@ export default function PaymentResultPage() {
           stopped = true;
         } else if (
           order.payment_status === "failed" ||
-          order.order_status === "cancelled"
+          ("order_status" in order && order.order_status === "cancelled")
         ) {
           setResult("failed");
           stopped = true;
@@ -57,7 +58,7 @@ export default function PaymentResultPage() {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [orderId]);
+  }, [orderId, checkoutId]);
 
   const message = {
     checking: "Checking your payment...",
@@ -75,7 +76,7 @@ export default function PaymentResultPage() {
           className="w-full rounded-2xl border border-[#EEDFD3] bg-white p-8 text-center shadow-sm"
         >
           <h1 className="text-2xl font-bold text-[#3A2925]">
-            {message}
+            {result === "paid" && checkoutId ? "Payment confirmed! All business orders are placed." : message}
           </h1>
 
           {orderId && (
@@ -83,12 +84,13 @@ export default function PaymentResultPage() {
               Order #{orderId.slice(-8).toUpperCase()}
             </p>
           )}
+          {checkoutId && <p className="mt-3 text-sm text-[#71605A]">Combined checkout #{checkoutId.slice(-8).toUpperCase()}</p>}
 
           <Link
-            to="/customer"
+            to="/orders"
             className="mt-6 inline-block rounded-xl bg-[#E85D3F] px-5 py-3 font-semibold text-white"
           >
-            Go to dashboard
+            View my orders
           </Link>
         </section>
       </main>

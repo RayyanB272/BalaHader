@@ -2,6 +2,7 @@ import {
   BrowserRouter,
   Routes,
   Route,
+  Navigate,
 } from "react-router-dom";
 
 import LoginPage from "./pages/LoginPage";
@@ -45,7 +46,9 @@ import ScrollToTop from "./components/ScrollToTop";
 import LegalPage from "./pages/LegalPage";
 import SmartBasketPage from "./pages/SmartBasketPage";
 import SellerInsightsPage from "./pages/SellerInsightsPage";
-import CharityOrdersPage from "./pages/CharityOrdersPage";
+import ProfilePage from "./pages/ProfilePage";
+import ReviewsPage from "./pages/ReviewsPage";
+import SavedListingsPage from "./pages/SavedListingsPage";
 
 function App() {
   return (
@@ -100,6 +103,7 @@ function App() {
         <Route path="/browse" element={<BrowseFood />} />
         <Route path="/food/:id" element={<FoodDetails />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/saved" element={<SavedListingsPage />} />
         <Route path="/" element={<Landing />} />
         <Route
           path="/checkout"
@@ -144,6 +148,9 @@ function App() {
   }
 />
         <Route path="/access-denied" element={<AccessDeniedPage />} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/business/reviews" element={<ProtectedRoute allowedRole="business"><ReviewsPage role="business" /></ProtectedRoute>} />
+        <Route path="/admin/reviews" element={<ProtectedRoute allowedRole="admin"><ReviewsPage role="admin" /></ProtectedRoute>} />
         <Route
           path="/business/donations"
           element={
@@ -178,7 +185,7 @@ function App() {
         />
         <Route
           path="/charity/orders"
-          element={<ProtectedRoute allowedRole="charity"><CharityOrdersPage /></ProtectedRoute>}
+          element={<ProtectedRoute allowedRole="charity"><Navigate to="/charity/claims" replace /></ProtectedRoute>}
         />
         <Route
           path="/admin/charities"

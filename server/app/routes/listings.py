@@ -81,6 +81,11 @@ def create_listing(
         "donation_eligible": data.donation_eligible,
 
         "image_url": data.image_url,
+        "servings_per_package": data.servings_per_package,
+        "package_contents": data.package_contents,
+        "dietary_tags": data.dietary_tags,
+        "allergens": data.allergens,
+        "suitable_meals": data.suitable_meals,
 
         "status": "active",
 
@@ -509,6 +514,11 @@ def get_public_listings(
             "image_url": listing.get(
                 "image_url"
             ),
+            "servings_per_package": listing.get("servings_per_package", 1),
+            "package_contents": listing.get("package_contents"),
+            "dietary_tags": listing.get("dietary_tags", []),
+            "allergens": listing.get("allergens", []),
+            "suitable_meals": listing.get("suitable_meals", []),
             "average_rating": average_rating,
             "review_count": len(rating_rows),
             "business": {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ExpandableCard from "../components/ui/ExpandableCard";
 import DashboardShell from "../components/layout/DashboardShell";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -47,6 +47,12 @@ export default function BusinessOrdersPage() {
   const [error, setError] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const filteredOrders = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return orders.filter((order) => (status === "all" || order.order_status === status) && (!query || order._id.toLowerCase().includes(query) || order.items.some((item) => (item.title ?? "").toLowerCase().includes(query))));
+  }, [orders, search, status]);
 
   async function loadOrders() {
     setLoading(true);
@@ -103,6 +109,10 @@ export default function BusinessOrdersPage() {
       title="Customer orders"
       description="Prepare orders and update customers as their food becomes ready."
     >
+      <section className="grid gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search orders..." className="rounded-xl border border-[#EEDFD3] px-4 py-2.5 text-sm outline-none focus:border-[#E85D3F]" />
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-2.5 text-sm"><option value="all">All statuses</option><option value="pending_payment">Pending payment</option><option value="confirmed">Confirmed</option><option value="preparing">Preparing</option><option value="ready">Ready</option><option value="out_for_delivery">Out for delivery</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select>
+      </section>
       {actionError && (
         <div
           role="alert"
@@ -119,16 +129,16 @@ export default function BusinessOrdersPage() {
           message="We couldn't load your business orders."
           onRetry={() => void loadOrders()}
         />
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No customer orders yet"
-            description="New paid orders will appear here."
+            title={orders.length ? "No matching orders" : "No customer orders yet"}
+            description={orders.length ? "Try another search or status." : "New paid orders will appear here."}
           />
         </section>
       ) : (
         <div className="space-y-5">
-          {orders.map((order) => {
+          {filteredOrders.map((order) => {
             const nextStatus = getNextStatus(order);
             const canAdvance =
               order.payment_status === "paid" && nextStatus !== null;

@@ -42,8 +42,8 @@ def get_current_user(
 
     if not user:
         raise HTTPException(
-            status_code=404,
-            detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your session is no longer valid. Please sign in again."
         )
 
     user["_id"] = str(user["_id"])

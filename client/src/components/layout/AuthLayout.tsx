@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, HeartHandshake, Leaf, Sprout, Store } from "lucide-react";
+import { ArrowLeft, HeartHandshake, Leaf, Store } from "lucide-react";
+import BrandIcon from "../ui/BrandIcon";
 
 const points = [
   { icon: Leaf, title: "Save quality food", text: "Surplus meals at a fraction of the price." },
@@ -26,9 +27,7 @@ export default function AuthLayout({
         <div className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full border-[48px] border-white/5" />
 
         <Link to="/" className="relative flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E85D3F]">
-            <Sprout size={24} />
-          </span>
+          <BrandIcon size="lg" className="ring-1 ring-white/15" />
           <span className="font-display text-2xl font-bold">BalaHader</span>
         </Link>
 
@@ -57,7 +56,7 @@ export default function AuthLayout({
       <main className="flex min-h-screen flex-col px-5 py-6 sm:px-10 lg:h-screen lg:min-h-0 lg:overflow-y-auto">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold text-[#3A2925] lg:hidden">
-            <Sprout size={22} className="text-[#C9472E]" /> BalaHader
+            <BrandIcon size="sm" /> BalaHader
           </Link>
           <Link
             to="/"

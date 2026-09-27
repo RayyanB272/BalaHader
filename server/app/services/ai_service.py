@@ -1,4 +1,5 @@
 import json
+import socket
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -18,6 +19,12 @@ def _generate_with_ollama(
         "model": settings.OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": "10m",
+        "options": {
+            "temperature": 0.15,
+            "num_ctx": 2048,
+            "num_predict": 320,
+        },
     }
 
     if json_output:
@@ -33,7 +40,7 @@ def _generate_with_ollama(
     )
 
     try:
-        with urlopen(request, timeout=120) as response:
+        with urlopen(request, timeout=30) as response:
             response_data = json.loads(
                 response.read().decode("utf-8")
             )
@@ -45,7 +52,7 @@ def _generate_with_ollama(
         raise RuntimeError(
             "Ollama is not running. Start Ollama and try again."
         ) from error
-    except TimeoutError as error:
+    except (TimeoutError, socket.timeout) as error:
         raise RuntimeError(
             "The local AI took too long to respond."
         ) from error
@@ -104,15 +111,17 @@ Available valid business options:
 {json.dumps(business_options, default=str)}
 
 Rules:
-- Choose items from only one business.
+- You may choose items from different businesses when that produces a better meal.
 - Use only business IDs and listing IDs provided.
 - Never invent products, prices, quantities, businesses, or delivery fees.
 - Keep the complete total at or below the customer's budget.
 - If delivery is selected, include the delivery fee in the budget.
 - Do not select more than each item's available_quantity.
 - Prefer a useful basket for the number of people and meal purpose.
-- Treat each quantity unit as one food portion.
-- Select at least people multiplied by meals total portions.
+- Use each listing's servings_per_unit value when calculating coverage.
+- Select enough total servings for people multiplied by meals.
+- When people is 1, never select quantity greater than 1 for the same listing.
+- Include every listing ID in locked_listing_ids.
 - The basket may contain one meal type or a mix of meal types.
 - Consider the customer's preferences when possible.
 - Do not claim that stock is reserved.
@@ -127,6 +136,7 @@ Return exactly this JSON structure:
     {{
       "listing_id": "provided listing ID",
       "title": "provided listing title",
+      "business_id": "provided business ID",
       "quantity": 1
     }}
   ],

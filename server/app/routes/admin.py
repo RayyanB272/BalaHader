@@ -496,7 +496,10 @@ def refund_order(
         )
 
     payment = payments_collection.find_one({
-        "order_id": order_id,
+        "$or": [
+            {"order_id": order_id},
+            {"order_ids": order_id}
+        ],
         "status": {
             "$in": [
                 "succeeded",
@@ -522,9 +525,12 @@ def refund_order(
         )
 
     try:
-        refund = stripe.Refund.create(
-            payment_intent=payment_intent_id
-        )
+        refund_arguments = {
+            "payment_intent": payment_intent_id
+        }
+        if payment.get("order_ids"):
+            refund_arguments["amount"] = int(round(order["total_amount"] * 100))
+        refund = stripe.Refund.create(**refund_arguments)
 
     except Exception as error:
         raise HTTPException(
@@ -556,7 +562,7 @@ def refund_order(
         },
         {
             "$set": {
-                "status": "refunded",
+                "status": "partially_refunded" if payment.get("order_ids") else "refunded",
                 "stripe_refund_id": refund.id,
                 "refunded_at": now,
                 "updated_at": now

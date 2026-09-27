@@ -1,6 +1,6 @@
 import api from "./api";
 
-export interface PendingCharity {
+export interface AdminCharity {
   _id: string;
   user_id: string;
   organization_name: string;
@@ -9,7 +9,9 @@ export interface PendingCharity {
   address: string;
   area: string;
   verification_document_url?: string;
-  verification_status: "pending";
+  verification_status: "pending" | "verified" | "rejected";
+  verification_reason?: string;
+  verified_at?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -19,11 +21,11 @@ export interface AdminCharityActionResponse {
   reason: string;
 }
 
-export async function getPendingCharities(): Promise<
-  PendingCharity[]
+export async function getAdminCharities(): Promise<
+  AdminCharity[]
 > {
-  const response = await api.get<PendingCharity[]>(
-    "/admin/charities/pending"
+  const response = await api.get<AdminCharity[]>(
+    "/admin/charities"
   );
 
   return response.data;

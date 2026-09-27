@@ -105,7 +105,9 @@ def login(user: UserLogin, response: Response):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "role": db_user["role"]
+        "role": db_user["role"],
+        "first_name": db_user["first_name"],
+        "last_name": db_user["last_name"]
     }
 
 @router.post("/forgot-password")

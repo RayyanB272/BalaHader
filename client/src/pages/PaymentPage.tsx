@@ -9,13 +9,13 @@ import {
 } from "@stripe/react-stripe-js";
 import PageFrame from "../components/layout/PageFrame";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
-import { createPaymentIntent } from "../services/orderService";
+import { createCombinedPaymentIntent, createPaymentIntent } from "../services/orderService";
 
 const stripePromise = loadStripe(
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
 );
 
-function PaymentForm({ orderId }: { orderId: string }) {
+function PaymentForm({ resultTarget }: { resultTarget: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ function PaymentForm({ orderId }: { orderId: string }) {
     const result = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/payment-result?order=${orderId}`,
+        return_url: `${window.location.origin}${resultTarget}`,
       },
       redirect: "if_required",
     });
@@ -43,7 +43,7 @@ function PaymentForm({ orderId }: { orderId: string }) {
       return;
     }
 
-    window.location.href = `/payment-result?order=${orderId}`;
+    window.location.href = resultTarget;
   }
 
   return (
@@ -73,19 +73,27 @@ function PaymentForm({ orderId }: { orderId: string }) {
 export default function PaymentPage() {
   const [params] = useSearchParams();
   const orderId = params.get("order");
+  const orderIds = params.get("orders")?.split(",").filter(Boolean) ?? [];
   const [clientSecret, setClientSecret] = useState("");
+  const [resultTarget, setResultTarget] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!orderId) {
+    if (!orderId && orderIds.length === 0) {
       setError("Missing order ID.");
       return;
     }
 
-    createPaymentIntent(orderId)
-      .then((data) => setClientSecret(data.client_secret))
+    const request = orderIds.length > 0
+      ? createCombinedPaymentIntent(orderIds)
+      : createPaymentIntent(orderId!);
+    request
+      .then((data) => {
+        setClientSecret(data.client_secret);
+        setResultTarget("checkout_id" in data ? `/payment-result?checkout=${data.checkout_id}` : `/payment-result?order=${orderId}`);
+      })
       .catch(() => setError("Could not start the payment."));
-  }, [orderId]);
+  }, [orderId, params]);
 
   return (
     <PageFrame hideFooter>
@@ -120,7 +128,7 @@ export default function PaymentPage() {
                 stripe={stripePromise}
                 options={{ clientSecret, appearance: { theme: "stripe" } }}
               >
-                <PaymentForm orderId={orderId!} />
+                <PaymentForm resultTarget={resultTarget} />
               </Elements>
             </div>
           )}

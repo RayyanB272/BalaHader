@@ -69,7 +69,33 @@ export const logout = async () => {
   } finally {
     localStorage.removeItem("access_token");
     localStorage.removeItem("role");
+    localStorage.removeItem("balahader_user_name");
   }
+};
+
+export interface AccountProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string | null;
+  role: "customer" | "business" | "charity" | "admin";
+  status: string;
+}
+
+export interface AccountProfileUpdate {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+}
+
+export const updateCurrentUser = async (
+  data: AccountProfileUpdate
+): Promise<AccountProfile> => {
+  const response = await api.patch<AccountProfile>("/users/me", data);
+  localStorage.setItem("balahader_user_name", JSON.stringify({ first_name: response.data.first_name, last_name: response.data.last_name }));
+  return response.data;
 };
 
 export interface BusinessProfileInput {

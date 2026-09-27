@@ -34,6 +34,7 @@ export default function NotificationsPage() {
     null
   );
   const [markingAll, setMarkingAll] = useState(false);
+  const [visibility, setVisibility] = useState<"all" | "unread" | "read">("all");
 
   async function loadNotifications() {
     setLoading(true);
@@ -97,6 +98,9 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(
     (notification) => !notification.is_read
   ).length;
+  const visibleNotifications = notifications.filter((notification) =>
+    visibility === "all" || (visibility === "unread" ? !notification.is_read : notification.is_read)
+  );
 
   return (
     <DashboardShell
@@ -104,6 +108,12 @@ export default function NotificationsPage() {
       title="Notifications"
       description="Follow important account, order, and donation updates."
     >
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4">
+        <p className="text-sm font-medium text-[#71605A]">Filter notifications</p>
+        <select value={visibility} onChange={(event) => setVisibility(event.target.value as "all" | "unread" | "read")} className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-2.5 text-sm">
+          <option value="all">All notifications</option><option value="unread">Unread</option><option value="read">Read</option>
+        </select>
+      </div>
       {!loading && !loadError && unreadCount > 0 && (
         <div className="flex justify-end">
           <button
@@ -126,16 +136,16 @@ export default function NotificationsPage() {
           message="We couldn't load your notifications."
           onRetry={() => void loadNotifications()}
         />
-      ) : notifications.length === 0 ? (
+      ) : visibleNotifications.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No notifications"
-            description="Important updates will appear here."
+            title={notifications.length ? "No matching notifications" : "No notifications"}
+            description={notifications.length ? "There are no notifications in this filter." : "Important updates will appear here."}
           />
         </section>
       ) : (
         <div className="space-y-3">
-          {notifications.map((notification) => (
+          {visibleNotifications.map((notification) => (
             <article
               key={notification._id}
               className={`rounded-2xl border p-5 ${

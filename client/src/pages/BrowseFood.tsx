@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Clock3, MapPin, Star } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Clock3, MapPin, Star, X } from "lucide-react";
 import { getListings, type Listing } from "../services/listingService";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorState from "../components/ui/ErrorState";
 import PageFrame from "../components/layout/PageFrame";
+import BrandIcon from "../components/ui/BrandIcon";
 
 const categories = [
     { label: "All", value: "" },
@@ -24,6 +26,14 @@ const sortOptions = [
     { value: "discount", label: "Biggest Discount" },
 ];
 
+function deadlineLabel(value?: string) {
+    if (!value) return "";
+    const hours = Math.max(0, (new Date(value).getTime() - Date.now()) / 3600000);
+    if (hours < 1) return "Ends in less than 1 hour";
+    if (hours < 24) return `Ends in ${Math.ceil(hours)} hours`;
+    return `Ends ${new Date(value).toLocaleDateString()}`;
+}
+
 export default function BrowseFood() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [listings, setListings] = useState<Listing[]>([]);
@@ -35,6 +45,16 @@ export default function BrowseFood() {
     const [maxPrice, setMaxPrice] = useState("");
     const [submittedMaxPrice, setSubmittedMaxPrice] = useState("");
     const [sort, setSort] = useState("default");
+    const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+
+    useEffect(() => {
+        if (!selectedListing) return;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const close = (event: KeyboardEvent) => { if (event.key === "Escape") setSelectedListing(null); };
+        window.addEventListener("keydown", close);
+        return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", close); };
+    }, [selectedListing]);
 
     async function loadListings() {
         setLoading(true);
@@ -201,7 +221,7 @@ export default function BrowseFood() {
             ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {sortedListings.map((listing) => (
-                        <Link key={listing._id} to={`/food/${listing._id}`}>
+                        <button key={listing._id} type="button" onClick={() => setSelectedListing(listing)} className="text-left">
                             <article className="overflow-hidden rounded-2xl border border-[#EEDFD3] bg-white shadow-sm transition-shadow hover:shadow-md">
                                 {listing.image_url ? (
                                     <img
@@ -210,8 +230,8 @@ export default function BrowseFood() {
                                         className="h-48 w-full object-cover"
                                     />
                                 ) : (
-                                    <div className="flex h-48 items-center justify-center bg-[#FFF0E5] text-5xl">
-                                        🌿
+                                    <div className="flex h-48 items-center justify-center bg-[#FFF0E5]">
+                                        <BrandIcon size="lg" />
                                     </div>
                                 )}
 
@@ -249,8 +269,10 @@ export default function BrowseFood() {
                                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#71605A]">
                                         <span className="flex items-center gap-1"><Star size={14} className="fill-[#F6B73C] text-[#F6B73C]" />{listing.review_count ? `${listing.average_rating} (${listing.review_count})` : "New"}</span>
                                         <span className="flex items-center gap-1 capitalize"><MapPin size={14} />{listing.fulfillment_type?.replaceAll("_", " ") || "Pickup"}</span>
-                                        {listing.sale_deadline && <span className="flex items-center gap-1"><Clock3 size={14} />Ends {new Date(listing.sale_deadline).toLocaleDateString()}</span>}
+                                        {listing.sale_deadline && <span className="flex items-center gap-1"><Clock3 size={14} />{deadlineLabel(listing.sale_deadline)}</span>}
                                     </div>
+
+                                    <div className="mt-3 flex flex-wrap gap-1.5"><span className="rounded-full bg-[#FFF0E5] px-2.5 py-1 text-xs font-semibold text-[#C9472E]">Serves {listing.servings_per_package || 1}</span>{listing.dietary_tags?.slice(0,2).map((tag)=><span key={tag} className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold capitalize text-green-700">{tag.replaceAll("_"," ")}</span>)}</div>
 
                                     {listing.available_quantity <= 3 && (
                                         <p className="mt-3 text-xs font-semibold text-[#C9472E]">Only {listing.available_quantity} left</p>
@@ -267,11 +289,23 @@ export default function BrowseFood() {
                                     </div>
                                 </div>
                             </article>
-                        </Link>
+                        </button>
                     ))}
                 </div>
             )}
         </main>
+        {selectedListing && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="customer-listing-title">
+            <button type="button" aria-label="Close listing details" onClick={() => setSelectedListing(null)} className="absolute inset-0 bg-[#241815]/20 backdrop-blur-[2px]" />
+            <article className="relative z-10 max-h-[86vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[#EEDFD3] bg-white p-5 shadow-2xl sm:p-6">
+              <button type="button" onClick={() => setSelectedListing(null)} aria-label="Close" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#EEDFD3] bg-white text-[#3A2925] shadow-sm hover:bg-[#FFF0E5]"><X size={18} /></button>
+              {selectedListing.image_url ? <img src={selectedListing.image_url} alt={selectedListing.title} className="h-52 w-full rounded-2xl object-cover" /> : <div className="flex h-52 items-center justify-center rounded-2xl bg-[#FFF0E5]"><BrandIcon size="lg" /></div>}
+              <div className="mt-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-[#E85D3F]">{selectedListing.category.replaceAll("_", " ")}</p><h2 id="customer-listing-title" className="mt-1 text-2xl font-bold text-[#3A2925]">{selectedListing.title}</h2><p className="mt-1 text-sm text-[#71605A]">{selectedListing.business.business_name}{selectedListing.business.area ? ` · ${selectedListing.business.area}` : ""}</p></div><span className="shrink-0 rounded-full bg-[#FFF0E5] px-3 py-1 text-xs font-semibold text-[#C9472E]">{selectedListing.available_quantity} available</span></div>
+              <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[#FFF9EE] p-4 text-sm"><div><p className="text-xs text-[#71605A]">Price</p><p className="mt-1 font-bold text-[#C9472E]">${selectedListing.discounted_price.toFixed(2)}</p></div><div><p className="text-xs text-[#71605A]">Fulfillment</p><p className="mt-1 font-semibold capitalize">{selectedListing.fulfillment_type?.replaceAll("_", " ") || "Pickup"}</p></div><div><p className="text-xs text-[#71605A]">Rating</p><p className="mt-1 font-semibold">{selectedListing.review_count ? `${selectedListing.average_rating} / 5` : "New listing"}</p></div><div><p className="text-xs text-[#71605A]">Deadline</p><p className="mt-1 font-semibold">{selectedListing.sale_deadline ? new Date(selectedListing.sale_deadline).toLocaleDateString() : "Not specified"}</p></div></div>
+              <Link to={`/food/${selectedListing._id}`} className="mt-5 block w-full rounded-xl bg-[#E85D3F] px-5 py-3 text-center text-sm font-semibold text-white hover:bg-[#C9472E]">View full details and order</Link>
+            </article>
+          </div>, document.body
+        )}
         </PageFrame>
     );
 }

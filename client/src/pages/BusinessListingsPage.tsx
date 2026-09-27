@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ExpandableCard from "../components/ui/ExpandableCard";
 import { Link } from "react-router-dom";
+import BrandIcon from "../components/ui/BrandIcon";
 import DashboardShell from "../components/layout/DashboardShell";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import ErrorState from "../components/ui/ErrorState";
@@ -23,6 +24,12 @@ export default function BusinessListingsPage() {
   const [disablingId, setDisablingId] =
     useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const filteredListings = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return listings.filter((listing) => (status === "all" || listing.status === status) && (!query || [listing.title, listing.category].some((value) => String(value ?? "").toLowerCase().includes(query))));
+  }, [listings, search, status]);
 
   async function loadListings() {
     setLoading(true);
@@ -97,6 +104,10 @@ export default function BusinessListingsPage() {
       title="Food listings"
       description="Manage the surplus food published by your business."
     >
+      <section className="grid gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search listings..." className="rounded-xl border border-[#EEDFD3] px-4 py-2.5 text-sm outline-none focus:border-[#E85D3F]" />
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-2.5 text-sm"><option value="all">All statuses</option><option value="active">Active</option><option value="sold_out">Sold out</option><option value="expired">Expired</option><option value="disabled">Disabled</option></select>
+      </section>
       <div className="mb-6 flex justify-end">
         <Link
           to="/business/listings/new"
@@ -122,16 +133,16 @@ export default function BusinessListingsPage() {
           message="We couldn't load your business listings."
           onRetry={() => void loadListings()}
         />
-      ) : listings.length === 0 ? (
+      ) : filteredListings.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No listings yet"
-            description="Create your first surplus food listing."
+            title={listings.length ? "No matching listings" : "No listings yet"}
+            description={listings.length ? "Try another search or status." : "Create your first surplus food listing."}
           />
         </section>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {listings.map((listing) => {
+          {filteredListings.map((listing) => {
             const available = Math.max(
               0,
               listing.remaining_quantity -
@@ -149,8 +160,8 @@ export default function BusinessListingsPage() {
                     className="h-44 w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-44 items-center justify-center bg-[#FFF0E5] text-5xl">
-                    🌿
+                  <div className="flex h-44 items-center justify-center bg-[#FFF0E5]">
+                    <BrandIcon size="lg" />
                   </div>
                 )
                 }

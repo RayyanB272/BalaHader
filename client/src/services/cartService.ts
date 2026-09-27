@@ -52,16 +52,6 @@ export function addToCart(listing: ListingDetail): void {
   const cart = getCart();
   const available = Math.max(0, listing.remaining_quantity - (listing.reserved_quantity ?? 0));
 
-  // The current backend creates one order for one business.
-  if (
-    cart.length > 0 &&
-    cart[0].business_id !== listing.business.id
-  ) {
-    throw new Error(
-      "Please finish your order from the first business before adding food from another."
-    );
-  }
-
   const existing = cart.find((item) => item.listing_id === listing._id);
   if (available === 0 || (existing?.quantity ?? 0) >= available) {
     throw new Error("The requested quantity is no longer available.");
@@ -107,6 +97,13 @@ export function clearCart(): void {
   notifyCartChanged();
 }
 
+export function clearBusinessFromCart(businessId: string): CartItem[] {
+  const next = getCart().filter((item) => item.business_id !== businessId);
+  localStorage.setItem(CART_KEY, JSON.stringify(next));
+  notifyCartChanged();
+  return next;
+}
+
 export async function replaceCartWithSmartBasket(
   basket: SmartBasketResponse
 ): Promise<CartItem[]> {
@@ -130,9 +127,9 @@ export async function replaceCartWithSmartBasket(
         );
       }
 
-      if (listing.business.id !== basket.business_id) {
+      if (listing.business.id !== suggestedItem.business_id) {
         throw new Error(
-          "One of the suggested items belongs to another business."
+          "One of the suggested items no longer belongs to the expected business."
         );
       }
 
@@ -153,8 +150,8 @@ export async function replaceCartWithSmartBasket(
         title: listing.title,
         price: listing.discounted_price,
         quantity: suggestedItem.quantity,
-        business_id: listing.business.id,
-        business_name: listing.business.name,
+        business_id: suggestedItem.business_id,
+        business_name: suggestedItem.business_name || listing.business.name,
         image_url: listing.image_url,
         available_quantity: availableQuantity,
       };

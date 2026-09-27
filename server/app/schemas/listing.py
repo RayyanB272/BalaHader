@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 
 
@@ -35,7 +35,12 @@ class ListingCreate(BaseModel):
     donate_if_unsold: bool = True
     donation_eligible: bool = True
 
-    image_url: Optional[str] = None
+    image_url: str = Field(min_length=1)
+    servings_per_package: int = Field(default=1, gt=0, le=100)
+    package_contents: Optional[str] = None
+    dietary_tags: List[Literal["vegetarian", "vegan", "dairy_free", "gluten_free", "halal"]] = Field(default_factory=list)
+    allergens: List[str] = Field(default_factory=list)
+    suitable_meals: List[Literal["breakfast", "lunch", "dinner", "snacks", "gathering"]] = Field(default_factory=list)
 
 class ListingUpdate(BaseModel):
     title: Optional[str] = None
@@ -83,6 +88,11 @@ class ListingUpdate(BaseModel):
     donate_if_unsold: Optional[bool] = None
     donation_eligible: Optional[bool] = None
     image_url: Optional[str] = None
+    servings_per_package: Optional[int] = Field(default=None, gt=0, le=100)
+    package_contents: Optional[str] = None
+    dietary_tags: Optional[List[str]] = None
+    allergens: Optional[List[str]] = None
+    suitable_meals: Optional[List[str]] = None
 
 
 class ListingDisable(BaseModel):

@@ -32,6 +32,11 @@ export interface BusinessListing {
   donate_if_unsold: boolean;
   donation_eligible: boolean;
   image_url?: string;
+  servings_per_package?: number;
+  package_contents?: string;
+  dietary_tags?: string[];
+  allergens?: string[];
+  suitable_meals?: string[];
   status: string;
   disabled_reason?: string;
   disabled_at?: string;
@@ -50,7 +55,12 @@ export interface CreateListingData {
   fulfillment_type: FulfillmentType;
   donate_if_unsold: boolean;
   donation_eligible: boolean;
-  image_url?: string;
+  image_url: string;
+  servings_per_package: number;
+  package_contents?: string;
+  dietary_tags: string[];
+  allergens: string[];
+  suitable_meals: string[];
 }
 
 export type UpdateListingData = Partial<

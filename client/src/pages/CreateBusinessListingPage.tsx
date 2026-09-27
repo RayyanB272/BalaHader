@@ -38,6 +38,11 @@ export default function CreateBusinessListingPage() {
     fulfillmentType: "pickup" as FulfillmentType,
     donateIfUnsold: true,
     donationEligible: true,
+    servingsPerPackage: "1",
+    packageContents: "",
+    dietaryTags: [] as string[],
+    allergens: "",
+    suitableMeals: [] as string[],
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -108,11 +113,13 @@ export default function CreateBusinessListingPage() {
       setError("The pickup deadline must be after the sale deadline.");
       return;
     }
+    if (!imageFile) return setError("Upload a clear food image before publishing the listing.");
+    if (!form.suitableMeals.length) return setError("Choose at least one suitable meal type.");
 
     setSaving(true);
 
     try {
-      let uploadedImageUrl: string | undefined;
+      let uploadedImageUrl = "";
 
       if (imageFile) {
         const uploadResult = await uploadFoodImage(imageFile);
@@ -132,6 +139,11 @@ export default function CreateBusinessListingPage() {
         donate_if_unsold: form.donateIfUnsold,
         donation_eligible: form.donationEligible,
         image_url: uploadedImageUrl,
+        servings_per_package: Number(form.servingsPerPackage),
+        package_contents: form.packageContents.trim() || undefined,
+        dietary_tags: form.dietaryTags,
+        allergens: form.allergens.split(",").map((value) => value.trim()).filter(Boolean),
+        suitable_meals: form.suitableMeals,
       });
 
       navigate("/business/listings");
@@ -211,6 +223,11 @@ export default function CreateBusinessListingPage() {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label>
+            <span className="mb-2 block text-sm font-semibold text-[#3A2925]">Servings per package</span>
+            <input required type="number" min="1" max="100" value={form.servingsPerPackage} onChange={(event) => setForm({ ...form, servingsPerPackage: event.target.value })} className={inputClass} />
           </label>
 
           <label>
@@ -300,6 +317,15 @@ export default function CreateBusinessListingPage() {
           </label>
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label><span className="mb-2 block text-sm font-semibold text-[#3A2925]">Package contents</span><input value={form.packageContents} onChange={(event) => setForm({ ...form, packageContents: event.target.value })} placeholder="Example: 4 cake slices" className={inputClass} /></label>
+          <label><span className="mb-2 block text-sm font-semibold text-[#3A2925]">Allergens</span><input value={form.allergens} onChange={(event) => setForm({ ...form, allergens: event.target.value })} placeholder="Example: milk, nuts, gluten" className={inputClass} /><span className="mt-1 block text-xs text-[#71605A]">Separate allergens with commas.</span></label>
+        </div>
+
+        <fieldset><legend className="mb-2 text-sm font-semibold text-[#3A2925]">Suitable for</legend><div className="flex flex-wrap gap-2">{["breakfast","lunch","dinner","snacks","gathering"].map((meal) => { const selected=form.suitableMeals.includes(meal); return <button key={meal} type="button" onClick={() => setForm({ ...form, suitableMeals: selected ? form.suitableMeals.filter((value) => value !== meal) : [...form.suitableMeals, meal] })} className={`rounded-full border px-3 py-1.5 text-sm capitalize ${selected ? "border-[#E85D3F] bg-[#FFF0E5] text-[#C9472E]" : "border-[#EEDFD3] text-[#71605A]"}`}>{meal}</button>; })}</div></fieldset>
+
+        <fieldset><legend className="mb-2 text-sm font-semibold text-[#3A2925]">Dietary tags</legend><div className="flex flex-wrap gap-2">{[["vegetarian","Vegetarian"],["vegan","Vegan"],["dairy_free","Dairy free"],["gluten_free","Gluten free"],["halal","Halal"]].map(([value,label]) => { const selected=form.dietaryTags.includes(value); return <button key={value} type="button" onClick={() => setForm({ ...form, dietaryTags: selected ? form.dietaryTags.filter((tag) => tag !== value) : [...form.dietaryTags, value] })} className={`rounded-full border px-3 py-1.5 text-sm ${selected ? "border-[#E85D3F] bg-[#FFF0E5] text-[#C9472E]" : "border-[#EEDFD3] text-[#71605A]"}`}>{label}</button>; })}</div></fieldset>
+
         <div>
           <label className="mb-2 block text-sm font-semibold text-[#3A2925]">
             Fulfillment
@@ -327,11 +353,13 @@ export default function CreateBusinessListingPage() {
             className="mb-2 block text-sm font-semibold text-[#3A2925]"
           >
             Food image
+            <span className="ml-1 text-[#E85D3F]">*</span>
           </label>
 
           <input
             id="food-image"
             type="file"
+            required
             accept="image/jpeg,image/png,image/webp"
             onChange={handleImageChange}
             className="block w-full rounded-xl border border-[#EEDFD3] bg-white px-4 py-3 text-sm text-[#71605A] file:mr-4 file:rounded-lg file:border-0 file:bg-[#FFF0E5] file:px-4 file:py-2 file:font-semibold file:text-[#C9472E]"
@@ -381,6 +409,11 @@ export default function CreateBusinessListingPage() {
             This listing is eligible for donation
           </label>
         </div>
+
+        <section className="rounded-2xl border border-[#EEDFD3] bg-[#FFF9EE] p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#E85D3F]">Listing preview</p>
+          <div className="mt-3 flex gap-4">{imagePreview ? <img src={imagePreview} alt="Listing preview" className="h-24 w-28 rounded-xl object-cover" /> : <div className="flex h-24 w-28 items-center justify-center rounded-xl border border-dashed border-[#EEDFD3] bg-white text-center text-xs text-[#71605A]">Image required</div>}<div className="min-w-0"><h2 className="truncate text-lg font-bold text-[#3A2925]">{form.title || "Your listing title"}</h2><p className="mt-1 text-sm capitalize text-[#71605A]">{form.category.replaceAll("_", " ")} · Serves {form.servingsPerPackage || 1}</p><p className="mt-2 font-bold text-[#C9472E]">{form.discountedPrice ? `$${Number(form.discountedPrice).toFixed(2)}` : "$0.00"}</p><div className="mt-2 flex flex-wrap gap-1">{form.dietaryTags.map((tag)=><span key={tag} className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] capitalize text-green-700">{tag.replaceAll("_"," ")}</span>)}</div></div></div>
+        </section>
 
         {error && (
           <div

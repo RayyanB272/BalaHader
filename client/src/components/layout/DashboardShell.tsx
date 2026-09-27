@@ -9,17 +9,19 @@ import {
   ListChecks,
   LogOut,
   PackageSearch,
+  CircleUserRound,
   ReceiptText,
   Settings,
   ShieldCheck,
   ShoppingBasket,
   Sparkles,
-  Sprout,
   Store,
+  Star,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { logout } from "../../services/authService";
+import BrandIcon from "../ui/BrandIcon";
 
 type Role = "customer" | "business" | "charity" | "admin";
 
@@ -44,12 +46,12 @@ const roleLinks: Record<Role, Item[]> = {
     { to: "/business/listings", label: "Food listings", icon: ListChecks },
     { to: "/business/orders", label: "Customer orders", icon: ClipboardList },
     { to: "/business/donations", label: "Food donations", icon: HeartHandshake },
+    { to: "/business/reviews", label: "Reviews", icon: Star },
     { to: "/business/settings", label: "Business settings", icon: Settings },
   ],
   charity: [
     { to: "/charity/donations", label: "Available donations", icon: HeartHandshake },
     { to: "/charity/claims", label: "My claims", icon: ClipboardList },
-    { to: "/charity/orders", label: "Donation orders", icon: ReceiptText },
     { to: "/charity/settings", label: "Charity profile", icon: Settings },
   ],
   admin: [
@@ -59,6 +61,7 @@ const roleLinks: Record<Role, Item[]> = {
     { to: "/admin/listings", label: "Listing moderation", icon: PackageSearch },
     { to: "/admin/orders", label: "Order management", icon: ReceiptText },
     { to: "/admin/donations", label: "Donation management", icon: HeartHandshake },
+    { to: "/admin/reviews", label: "Reviews", icon: Star },
     { to: "/admin/settings", label: "Platform settings", icon: Settings },
   ],
 };
@@ -93,20 +96,19 @@ export default function DashboardShell({
     navigate("/login", { replace: true });
   }
 
-  const items: Item[] = [
-    { to: `/${role}`, label: "Overview", icon: LayoutDashboard, end: true },
-    { to: "/notifications", label: "Notifications", icon: Bell },
-    ...roleLinks[role],
-  ];
+  const overview: Item = { to: `/${role}`, label: "Overview", icon: LayoutDashboard, end: true };
+  const profileLink: Item = { to: "/profile", label: "My profile", icon: CircleUserRound };
+  const notificationLink: Item = { to: "/notifications", label: "Notifications", icon: Bell };
+  const items: Item[] = role === "admin"
+    ? [overview, notificationLink, ...roleLinks.admin, profileLink]
+    : [overview, notificationLink, ...roleLinks[role], ...(role === "charity" ? [] : [profileLink])];
 
   return (
     <div className="min-h-screen bg-[#FFF9EE] text-[#3A2925] lg:flex">
       <aside className="bg-[#3A2925] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-72 lg:shrink-0 lg:flex-col">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-7">
           <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E85D3F] text-white">
-              <Sprout size={22} />
-            </span>
+            <BrandIcon className="ring-1 ring-white/15" />
             <span className="font-display text-lg font-bold leading-none text-white">
               BalaHader
               <span className="mt-1.5 block font-sans text-xs font-medium text-[#C9B3A6]">

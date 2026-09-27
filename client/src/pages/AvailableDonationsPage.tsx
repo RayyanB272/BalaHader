@@ -1,10 +1,11 @@
 import axios from "axios";
 import ExpandableCard from "../components/ui/ExpandableCard";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardShell from "../components/layout/DashboardShell";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import ErrorState from "../components/ui/ErrorState";
 import EmptyState from "../components/ui/EmptyState";
+import BrandIcon from "../components/ui/BrandIcon";
 import {
   claimDonation,
   getAvailableDonations,
@@ -21,6 +22,15 @@ export default function AvailableDonationsPage() {
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+
+  const categories = useMemo(() => Array.from(new Set(donations.map((donation) => donation.category).filter(Boolean))).sort(), [donations]);
+  const filteredDonations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return donations.filter((donation) => (category === "all" || donation.category === category) &&
+      (!query || [donation.title, donation.category].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))));
+  }, [donations, search, category]);
 
   async function loadDonations() {
     setLoading(true);
@@ -87,6 +97,10 @@ export default function AvailableDonationsPage() {
       title="Available donations"
       description="Find surplus food offered by local businesses."
     >
+      <section className="grid gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search available donations..." aria-label="Search available donations" className="rounded-xl border border-[#EEDFD3] px-4 py-2.5 text-sm outline-none focus:border-[#E85D3F]" />
+        <select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Filter donations by category" className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-2.5 text-sm"><option value="all">All categories</option>{categories.map((value) => <option key={String(value)} value={String(value)} className="capitalize">{formatValue(String(value))}</option>)}</select>
+      </section>
       {actionError && (
         <div
           role="alert"
@@ -103,16 +117,16 @@ export default function AvailableDonationsPage() {
           message={loadError}
           onRetry={() => void loadDonations()}
         />
-      ) : donations.length === 0 ? (
+      ) : filteredDonations.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No donations are available"
-            description="New donations from local businesses will appear here."
+            title={donations.length ? "No matching donations" : "No donations are available"}
+            description={donations.length ? "Try another search or category." : "New donations from local businesses will appear here."}
           />
         </section>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {donations.map((donation) => (
+          {filteredDonations.map((donation) => (
             <ExpandableCard
               key={donation._id}
               header={
@@ -120,7 +134,7 @@ export default function AvailableDonationsPage() {
               {donation.image_url ? (
                 <img src={donation.image_url} alt={donation.title} className="mb-4 h-40 w-full rounded-xl object-cover" />
               ) : (
-                <div className="mb-4 flex h-40 items-center justify-center rounded-xl bg-[#FFF0E5] text-4xl">🍲</div>
+                <div className="mb-4 flex h-40 items-center justify-center rounded-xl bg-[#FFF0E5]"><BrandIcon size="lg" /></div>
               )}
               <div className="flex items-start justify-between gap-3">
                 <div>

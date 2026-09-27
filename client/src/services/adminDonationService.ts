@@ -7,6 +7,7 @@ export interface AdminDonation {
   charity_id?: string | null;
   title: string;
   category?: string;
+  image_url?: string;
   quantity: number;
   status: string;
   pickup_deadline?: string;

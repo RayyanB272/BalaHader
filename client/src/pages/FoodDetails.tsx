@@ -3,10 +3,12 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { getListing, type ListingDetail } from "../services/listingService";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import ErrorState from "../components/ui/ErrorState";
+import BrandIcon from "../components/ui/BrandIcon";
 import { addToCart } from "../services/cartService";
 import PageFrame from "../components/layout/PageFrame";
 import { getListingReviews, type ListingReviews } from "../services/reviewService";
-import { Star } from "lucide-react";
+import { Heart, Star } from "lucide-react";
+import { isFavorite, toggleFavorite } from "../services/favoriteService";
 
 function PageShell({ children }: { children: React.ReactNode }) {
     return (
@@ -23,6 +25,7 @@ export default function FoodDetails() {
     const [cartNotice, setCartNotice] = useState("");
     const [cartError, setCartError] = useState("");
     const [reviews, setReviews] = useState<ListingReviews | null>(null);
+    const [saved, setSaved] = useState(false);
 
     useEffect(() => {
         if (!id) {
@@ -36,6 +39,7 @@ export default function FoodDetails() {
             .catch(() => setError(true))
             .finally(() => setLoading(false));
         getListingReviews(id).then(setReviews).catch(() => setReviews(null));
+        setSaved(isFavorite(id));
     }, [id]);
 
     if (loading) return <PageShell><LoadingSpinner /></PageShell>;
@@ -61,8 +65,8 @@ export default function FoodDetails() {
                         className="h-full min-h-80 w-full object-cover"
                     />
                 ) : (
-                    <div className="flex min-h-80 items-center justify-center bg-[#FFF0E5] text-7xl">
-                        🌿
+                    <div className="flex min-h-80 items-center justify-center bg-[#FFF0E5]">
+                        <BrandIcon size="lg" />
                     </div>
                 )}
 
@@ -70,9 +74,7 @@ export default function FoodDetails() {
                     <span className="text-sm capitalize text-[#C9472E]">
                         {listing.category.replaceAll("_", " ")}
                     </span>
-                    <h1 className="mt-2 text-3xl font-bold text-[#3A2925]">
-                        {listing.title}
-                    </h1>
+                    <div className="mt-2 flex items-start justify-between gap-3"><h1 className="text-3xl font-bold text-[#3A2925]">{listing.title}</h1><button type="button" onClick={()=>setSaved(toggleFavorite(listing._id))} aria-label={saved?"Remove from saved":"Save listing"} className="rounded-xl border border-[#EEDFD3] p-2.5 text-[#E85D3F] hover:bg-[#FFF0E5]"><Heart size={21} className={saved?"fill-current":""}/></button></div>
                     <p className="mt-4 text-[#71605A]">
                         {listing.description || "No description provided."}
                     </p>
@@ -84,6 +86,9 @@ export default function FoodDetails() {
                     <p className="mt-2 text-sm text-[#71605A]">
                         {Math.max(0, available)} available
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-[#FFF0E5] px-3 py-1 text-xs font-semibold text-[#C9472E]">Serves {listing.servings_per_package || 1}</span>{listing.fulfillment_type && <span className="rounded-full bg-[#FFF0E5] px-3 py-1 text-xs font-semibold capitalize text-[#C9472E]">{listing.fulfillment_type.replaceAll("_"," ")}</span>}{listing.dietary_tags?.map((tag)=><span key={tag} className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold capitalize text-green-700">{tag.replaceAll("_"," ")}</span>)}</div>
+                    {listing.package_contents && <p className="mt-4 text-sm"><span className="font-semibold">Package:</span> {listing.package_contents}</p>}
+                    {!!listing.allergens?.length && <p className="mt-2 text-sm text-[#71605A]"><span className="font-semibold text-[#3A2925]">Allergens:</span> {listing.allergens.join(", ")}</p>}
 
                     {listing.pickup_deadline && (
                         <p className="mt-2 text-sm text-[#71605A]">

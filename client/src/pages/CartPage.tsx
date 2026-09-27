@@ -2,12 +2,27 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import PageFrame from "../components/layout/PageFrame";
 import EmptyState from "../components/ui/EmptyState";
+import BrandIcon from "../components/ui/BrandIcon";
 import { clearCart, getCart, updateCartQuantity } from "../services/cartService";
 
 export default function CartPage() {
   const [items, setItems] = useState(getCart);
   const [error, setError] = useState("");
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const businessGroups = Array.from(
+    items.reduce((groups, item) => {
+      const group = groups.get(item.business_id) ?? {
+        businessId: item.business_id,
+        businessName: item.business_name,
+        items: [],
+        subtotal: 0,
+      };
+      group.items.push(item);
+      group.subtotal += item.price * item.quantity;
+      groups.set(item.business_id, group);
+      return groups;
+    }, new Map<string, { businessId: string; businessName: string; items: typeof items; subtotal: number }>()).values()
+  );
 
   function changeQuantity(id: string, quantity: number) {
     try {
@@ -43,7 +58,7 @@ export default function CartPage() {
               {items.map((item) => (
                 <article key={item.listing_id} className="flex gap-4 rounded-2xl border border-[#EEDFD3] bg-white p-4 shadow-sm">
                   <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#FFF0E5] text-3xl">
-                    {item.image_url ? <img src={item.image_url} alt="" className="h-full w-full object-cover" /> : "🌿"}
+                    {item.image_url ? <img src={item.image_url} alt="" className="h-full w-full object-cover" /> : <BrandIcon size="sm" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <Link to={`/food/${item.listing_id}`} className="font-semibold text-[#3A2925] hover:text-[#C9472E]">{item.title}</Link>
@@ -65,12 +80,8 @@ export default function CartPage() {
               <div className="mt-5 flex justify-between border-b border-[#EEDFD3] pb-4 text-sm"><span>Items</span><span>{items.reduce((sum, item) => sum + item.quantity, 0)}</span></div>
               <div className="mt-4 flex justify-between font-bold text-[#3A2925]"><span>Subtotal</span><span>${total.toFixed(2)}</span></div>
               <p className="mt-3 text-xs text-[#71605A]">Delivery charges, if applicable, are calculated during checkout.</p>
-              <Link
-                to="/checkout"
-                className="mt-4 block w-full rounded-xl bg-[#E85D3F] px-5 py-3 text-center text-sm font-semibold text-white"
-              >
-                Continue to checkout
-              </Link>
+              <Link to="/checkout" className="mt-5 block w-full rounded-xl bg-[#E85D3F] px-4 py-3 text-center text-sm font-semibold text-white hover:bg-[#C9472E]">Checkout entire cart</Link>
+              {businessGroups.length > 1 && <p className="mt-3 text-xs text-[#71605A]">Pay once. BalaHader creates and distributes a separate order to each business.</p>}
               <button type="button" onClick={() => { if (window.confirm("Remove all items from your cart?")) { clearCart(); setItems([]); } }} className="mt-6 w-full rounded-xl border border-[#EEDFD3] py-2.5 text-sm font-semibold text-[#3A2925] hover:border-[#E85D3F]">Clear cart</button>
             </aside>
           </div>

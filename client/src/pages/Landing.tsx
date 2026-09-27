@@ -47,7 +47,8 @@ export default function Landing() {
       <PublicHeader />
 
       {/* Hero */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-16 grid lg:grid-cols-2 gap-10 items-center">
+      <section className="bg-[#FFF0E5]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-16 grid lg:grid-cols-2 gap-10 items-center">
         <div>
           <p className="text-xs font-semibold text-[#C9472E] uppercase tracking-widest mb-3">Good food shouldn't go to waste</p>
           <h1 className="font-display font-bold text-5xl sm:text-6xl text-[#3A2925] leading-tight mb-2">
@@ -104,6 +105,7 @@ export default function Landing() {
             </div>
           </div>
         </div>
+      </div>
       </section>
 
       {/* Categories */}
@@ -211,15 +213,15 @@ export default function Landing() {
                 to: '/register?type=charity',
               },
             ].map((card) => (
-              <div key={card.title} className="bg-white rounded-2xl border border-[#EEDFD3] overflow-hidden">
+              <div key={card.title} className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#EEDFD3] bg-white">
                 <div className="h-48 overflow-hidden">
                   <img src={card.img} alt={card.title} className="w-full h-full object-cover" />
                 </div>
-                <div className="p-5">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="w-10 h-10 bg-[#FFF0E5] rounded-xl flex items-center justify-center text-xl mb-3">{card.icon}</div>
                   <h3 className="font-display font-bold text-[#3A2925] text-lg mb-2">{card.title}</h3>
                   <p className="text-sm text-[#71605A] mb-4">{card.desc}</p>
-                  <Link to={card.to} className="inline-flex items-center gap-2 px-4 py-2 border border-[#E85D3F] text-[#C9472E] text-sm font-semibold rounded-xl hover:bg-[#E85D3F] hover:text-white transition-colors">
+                  <Link to={card.to} className="mt-auto inline-flex w-fit items-center gap-2 rounded-xl border border-[#E85D3F] px-4 py-2 text-sm font-semibold text-[#C9472E] transition-colors hover:bg-[#E85D3F] hover:text-white">
                     {card.cta} →
                   </Link>
                 </div>
@@ -230,7 +232,7 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="mx-4 sm:mx-6 mb-14 max-w-7xl lg:mx-auto rounded-3xl bg-[#FFF0E5] border border-[#EEDFD3] p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <section className="mx-4 mb-14 mt-12 max-w-7xl rounded-3xl border border-[#EEDFD3] bg-[#FFF0E5] p-8 sm:mx-6 sm:p-12 lg:mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
 <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-lg" />

@@ -26,6 +26,23 @@ export async function createOrder(
   return response.data;
 }
 
+export interface CheckoutDeliveryArea {
+  _id: string;
+  area_code: string;
+  area_name: string;
+  delivery_fee: number;
+  estimated_time_minutes?: number;
+}
+
+export async function getCheckoutDeliveryAreas(
+  businessId: string
+): Promise<CheckoutDeliveryArea[]> {
+  const response = await api.get<CheckoutDeliveryArea[]>(
+    `/businesses/${businessId}/delivery-areas`
+  );
+  return response.data;
+}
+
 export async function createPaymentIntent(orderId: string) {
   const response = await api.post("/payments/create-intent", {
     order_id: orderId,
@@ -45,4 +62,26 @@ export async function getOrder(orderId: string): Promise<OrderStatus> {
     `/orders/my-orders/${orderId}`
   );
   return response.data;
+}
+
+export async function createCombinedPaymentIntent(orderIds: string[]) {
+  const response = await api.post("/payments/create-batch-intent", {
+    order_ids: orderIds,
+  });
+  return response.data as {
+    checkout_id: string;
+    client_secret: string;
+    amount: number;
+    currency: string;
+    order_count: number;
+  };
+}
+
+export async function getCheckoutPayment(checkoutId: string): Promise<{
+  checkout_id: string;
+  order_ids: string[];
+  payment_status: string;
+  order_count: number;
+}> {
+  return (await api.get(`/payments/checkout/${checkoutId}`)).data;
 }

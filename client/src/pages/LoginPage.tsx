@@ -30,6 +30,7 @@ function LoginPage() {
       const data = await login({ email: email.trim().toLowerCase(), password });
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("role", data.role);
+      localStorage.setItem("balahader_user_name", JSON.stringify({ first_name: data.first_name, last_name: data.last_name }));
 
       if (["customer", "business", "charity", "admin"].includes(data.role)) {
         const requestedNext = searchParams.get("next");

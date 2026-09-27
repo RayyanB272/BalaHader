@@ -3,14 +3,11 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LogOut, ShoppingCart } from "lucide-react";
 import { logout } from "../../services/authService";
 import { getCartCount, subscribeToCart } from "../../services/cartService";
+import BrandIcon from "../ui/BrandIcon";
 
 const Logo = () => (
   <Link to="/" className="flex flex-shrink-0 items-center gap-2.5">
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3A2925] shadow-[0_6px_14px_-6px_rgba(22,61,43,0.7)]">
-      <svg viewBox="0 0 24 24" fill="#F6B73C" className="h-5 w-5">
-        <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 20c8 0 10-8 10-8s0 8-8 8a5.71 5.71 0 00-1.71.26L7.39 22H9c8 0 12-8 12-8s-2 4-4-6z" />
-      </svg>
-    </div>
+    <BrandIcon />
     <div>
       <div className="font-display text-lg font-bold leading-none text-[#3A2925]">BalaHader</div>
       <div className="mt-1 hidden text-[10px] font-medium leading-none text-[#71605A] sm:block">
@@ -104,7 +101,9 @@ export default function PublicHeader() {
         { to: "/customer", label: "Home" },
         { to: "/browse", label: "Browse Food" },
         { to: "/smart-basket", label: "Smart Basket" },
+        { to: "/saved", label: "Saved" },
         { to: "/orders", label: "My Orders" },
+        { to: "/profile", label: "My Profile" },
       ]
     : navLinks.filter((link) => link.to !== "/cart");
 
@@ -167,13 +166,20 @@ export default function PublicHeader() {
           )}
         </div>
 
-        <button
-          type="button"
-          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
-          className="rounded-lg p-2 text-[#3A2925] hover:bg-[#FFF0E5] md:hidden"
-        >
+        <div className="flex items-center gap-2 md:hidden">
+          {dashboardPath && role === "customer" && (
+            <Link to="/cart" aria-label={`Cart with ${cartCount} items`} className="relative rounded-xl border border-[#EEDFD3] bg-white p-2.5 text-[#E85D3F]">
+              <ShoppingCart size={20} />
+              {cartCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E85D3F] px-1 text-[10px] font-bold text-white">{cartCount > 99 ? "99+" : cartCount}</span>}
+            </Link>
+          )}
+          <button
+            type="button"
+            aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+            className="rounded-lg p-2 text-[#3A2925] hover:bg-[#FFF0E5]"
+          >
           <svg
             className="h-5 w-5"
             fill="none"
@@ -196,7 +202,8 @@ export default function PublicHeader() {
               />
             )}
           </svg>
-        </button>
+          </button>
+        </div>
       </div>
 
       {open && (
@@ -247,10 +254,7 @@ export default function PublicHeader() {
 
             <div className="border-t border-[#EEDFD3] bg-white/60 p-4">
               {dashboardPath && role === "customer" ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <Link to="/cart" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2 rounded-xl border border-[#E85D3F] py-3 text-sm font-semibold text-[#E85D3F]"><ShoppingCart size={18} /> Cart ({cartCount})</Link>
-                  <button type="button" onClick={async () => { setOpen(false); await logout(); navigate("/", { replace: true }); }} className="flex items-center justify-center gap-2 rounded-xl bg-[#E85D3F] py-3 text-sm font-semibold text-white"><LogOut size={18} /> Sign out</button>
-                </div>
+                <button type="button" onClick={async () => { setOpen(false); await logout(); navigate("/", { replace: true }); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E85D3F] py-3 text-sm font-semibold text-white"><LogOut size={18} /> Sign out</button>
               ) : dashboardPath ? (
                 <Link to={dashboardPath} onClick={() => setOpen(false)} className="block w-full rounded-xl bg-[#E85D3F] py-3 text-center text-sm font-semibold text-white hover:bg-[#C9472E]">
                   My Dashboard

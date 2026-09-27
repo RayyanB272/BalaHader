@@ -153,11 +153,52 @@ def user_doc(first, last, prefix, phone, role):
 
 
 def reset():
-    for collection in (
-        users_collection, businesses_collection, charities_collection,
-        listings_collection, donations_collection, delivery_areas_collection,
-    ):
-        collection.delete_many({"is_seed": True})
+    # Older versions of the seed script did not tag every record consistently.
+    # Remove every account in the reserved demo domain and anything owned by it
+    # so a duplicate email can never be selected during login.
+    demo_users = list(users_collection.find(
+        {"email": {"$regex": f"@{re.escape(DOMAIN)}$", "$options": "i"}},
+        {"_id": 1}
+    ))
+    demo_user_ids = [value for user in demo_users for value in (user["_id"], str(user["_id"]))]
+
+    demo_businesses = list(businesses_collection.find(
+        {"$or": [{"is_seed": True}, {"user_id": {"$in": demo_user_ids}}]},
+        {"_id": 1}
+    ))
+    demo_business_ids = [value for business in demo_businesses for value in (business["_id"], str(business["_id"]))]
+
+    demo_charities = list(charities_collection.find(
+        {"$or": [{"is_seed": True}, {"user_id": {"$in": demo_user_ids}}]},
+        {"_id": 1}
+    ))
+    demo_charity_ids = [value for charity in demo_charities for value in (charity["_id"], str(charity["_id"]))]
+
+    listings_collection.delete_many({
+        "$or": [{"is_seed": True}, {"business_id": {"$in": demo_business_ids}}]
+    })
+    donations_collection.delete_many({
+        "$or": [
+            {"is_seed": True},
+            {"business_id": {"$in": demo_business_ids}},
+            {"charity_id": {"$in": demo_charity_ids}},
+        ]
+    })
+    delivery_areas_collection.delete_many({
+        "$or": [{"is_seed": True}, {"business_id": {"$in": demo_business_ids}}]
+    })
+    businesses_collection.delete_many({
+        "$or": [{"is_seed": True}, {"user_id": {"$in": demo_user_ids}}]
+    })
+    charities_collection.delete_many({
+        "$or": [{"is_seed": True}, {"user_id": {"$in": demo_user_ids}}]
+    })
+    users_collection.delete_many({
+        "$or": [
+            {"is_seed": True},
+            {"email": {"$regex": f"@{re.escape(DOMAIN)}$", "$options": "i"}},
+        ]
+    })
     print("Removed previous demo data.")
 
 
@@ -179,7 +220,7 @@ def main():
     for name, kind, desc, area, address, phone, delivery, pickup, (f, l, prefix) in BUSINESSES:
         owner = users_collection.insert_one(user_doc(f, l, prefix, phone, "business"))
         business = businesses_collection.insert_one({
-            "user_id": owner.inserted_id,
+            "user_id": str(owner.inserted_id),
             "business_name": name,
             "business_type": kind,
             "description": desc,
@@ -220,7 +261,7 @@ def main():
         owner = users_collection.insert_one(user_doc(f, l, prefix, phone, "charity"))
         verified = status == "verified"
         charity = charities_collection.insert_one({
-            "user_id": owner.inserted_id,
+            "user_id": str(owner.inserted_id),
             "organization_name": name,
             "description": desc,
             "phone": phone,
@@ -272,6 +313,7 @@ def main():
             "charity_id": charity_ids[c] if c is not None else None,
             "title": listing["title"],
             "category": listing["category"],
+            "image_url": listing.get("image_url"),
             "quantity": qty,
             "status": state,
             "pickup_deadline": listing["pickup_deadline"],

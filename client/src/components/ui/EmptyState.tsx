@@ -1,14 +1,17 @@
+import type { ReactNode } from "react";
+import BrandIcon from "./BrandIcon";
+
 interface Props {
-  icon?: string;
+  icon?: ReactNode;
   title: string;
   description?: string;
   action?: { label: string; onClick: () => void };
 }
 
-export default function EmptyState({ icon = '🌿', title, description, action }: Props) {
+export default function EmptyState({ icon = <BrandIcon />, title, description, action }: Props) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#EEDFD3] bg-white/60 px-6 py-14 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E5] text-3xl ring-8 ring-[#FFF0E5]">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E5] ring-8 ring-[#FFF0E5]">
         {icon}
       </div>
       <h3 className="font-display text-xl font-semibold text-[#3A2925]">{title}</h3>

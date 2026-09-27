@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ExpandableCard from "../components/ui/ExpandableCard";
 import DashboardShell from "../components/layout/DashboardShell";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -21,6 +21,12 @@ export default function BusinessDonationsPage() {
   const [error, setError] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const filteredDonations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return donations.filter((donation) => (status === "all" || donation.status === status) && (!query || [donation.title, donation.category, donation._id].filter(Boolean).some((value) => String(value).toLowerCase().includes(query))));
+  }, [donations, search, status]);
 
   async function loadDonations() {
     setLoading(true);
@@ -71,6 +77,10 @@ export default function BusinessDonationsPage() {
       title="Food donations"
       description="Track donated food and prepare claimed donations for pickup."
     >
+      <section className="grid gap-3 rounded-2xl border border-[#EEDFD3] bg-white p-4 sm:grid-cols-[1fr_220px]">
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search donations..." className="rounded-xl border border-[#EEDFD3] px-4 py-2.5 text-sm outline-none focus:border-[#E85D3F]" />
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-[#EEDFD3] bg-white px-4 py-2.5 text-sm"><option value="all">All statuses</option><option value="available">Available</option><option value="claimed">Claimed</option><option value="ready_for_pickup">Ready for pickup</option><option value="completed">Completed</option><option value="expired">Expired</option></select>
+      </section>
       <div className="flex justify-end">
         <Link
           to="/business/donations/new"
@@ -95,16 +105,16 @@ export default function BusinessDonationsPage() {
           message="We couldn't load your donations."
           onRetry={() => void loadDonations()}
         />
-      ) : donations.length === 0 ? (
+      ) : filteredDonations.length === 0 ? (
         <section className="rounded-2xl border border-[#EEDFD3] bg-white">
           <EmptyState
-            title="No donations yet"
-            description="Donations created from your food listings will appear here."
+            title={donations.length ? "No matching donations" : "No donations yet"}
+            description={donations.length ? "Try another search or status." : "Donations created from your food listings will appear here."}
           />
         </section>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {donations.map((donation) => (
+          {filteredDonations.map((donation) => (
             <ExpandableCard
               key={donation._id}
               header={

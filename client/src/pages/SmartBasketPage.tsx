@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ShoppingBasket, Sparkles, TriangleAlert } from "lucide-react";
+import { Lock, RefreshCw, ShoppingBasket, Sparkles, Trash2, TriangleAlert, Unlock } from "lucide-react";
 import PageFrame from "../components/layout/PageFrame";
 import {
   generateSmartBasket,
@@ -10,7 +10,12 @@ import {
 } from "../services/smartBasketService";
 import { replaceCartWithSmartBasket } from "../services/cartService";
 
-const purposes = ["Family meal", "Breakfast", "Lunch", "Dinner", "Snacks", "Small gathering"];
+const purposes = ["Breakfast", "Lunch", "Dinner", "Snacks", "Gathering"];
+
+function validPurpose(value?: string) {
+  return purposes.includes(value || "") ? value! : "Lunch";
+}
+const preferenceOptions = ["Bakery", "Prepared meals", "Fresh produce", "Dairy", "Drinks", "Desserts", "Snacks", "Vegetarian", "No dairy"];
 
 const field =
   "h-11 w-full rounded-xl border border-[#EEDFD3] bg-white px-3.5 text-[15px] text-[#3A2925]";
@@ -26,12 +31,13 @@ interface SavedSmartBasket {
   fulfillmentType: FulfillmentType;
   areaCode: string;
   basket: SmartBasketResponse | null;
+  optimizationMode?: "best_match" | "lowest_price" | "most_variety";
 }
 
 function readSavedBasket(): SavedSmartBasket | null {
   try {
     const saved = JSON.parse(localStorage.getItem(SMART_BASKET_KEY) || "null") as SavedSmartBasket | null;
-    if (saved?.basket && typeof saved.basket.meals !== "number") saved.basket = null;
+    if (saved?.basket && (typeof saved.basket.meals !== "number" || saved.basket.items.some((item) => !item.business_id))) saved.basket = null;
     return saved;
   } catch {
     return null;
@@ -43,24 +49,26 @@ export default function SmartBasketPage() {
   const [budget, setBudget] = useState(saved?.budget ?? "20");
   const [people, setPeople] = useState(saved?.people ?? "2");
   const [meals, setMeals] = useState(saved?.meals ?? "1");
-  const [mealPurpose, setMealPurpose] = useState(saved?.mealPurpose ?? "Family meal");
+  const [mealPurpose, setMealPurpose] = useState(validPurpose(saved?.mealPurpose));
   const [preferences, setPreferences] = useState(saved?.preferences ?? "");
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(saved?.fulfillmentType ?? "pickup");
   const [areaCode, setAreaCode] = useState(saved?.areaCode ?? "");
+  const [optimizationMode, setOptimizationMode] = useState(saved?.optimizationMode ?? "best_match");
 
   const [basket, setBasket] = useState<SmartBasketResponse | null>(saved?.basket ?? null);
   const [loading, setLoading] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
   const [error, setError] = useState("");
+  const [lockedItems, setLockedItems] = useState<Set<string>>(new Set());
 
   const navigate = useNavigate();
   const resultRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     localStorage.setItem(SMART_BASKET_KEY, JSON.stringify({
-      budget, people, meals, mealPurpose, preferences, fulfillmentType, areaCode, basket,
+      budget, people, meals, mealPurpose, preferences, fulfillmentType, areaCode, basket, optimizationMode,
     }));
-  }, [budget, people, meals, mealPurpose, preferences, fulfillmentType, areaCode, basket]);
+  }, [budget, people, meals, mealPurpose, preferences, fulfillmentType, areaCode, basket, optimizationMode]);
 
   // On small screens the result sits below the form, so bring it into view.
   useEffect(() => {
@@ -69,9 +77,7 @@ export default function SmartBasketPage() {
     }
   }, [basket, loading]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function buildBasket(excludedListingIds: string[] = [], lockedListingIds: string[] = []) {
     const numericBudget = Number(budget);
     const numericPeople = Number(people);
     const numericMeals = Number(meals);
@@ -93,6 +99,9 @@ export default function SmartBasketPage() {
         meals: numericMeals,
         meal_purpose: mealPurpose.trim(),
         preferences: preferences.trim() || undefined,
+        excluded_listing_ids: excludedListingIds,
+        optimization_mode: optimizationMode,
+        locked_listing_ids: lockedListingIds,
         fulfillment_type: fulfillmentType,
         area_code: fulfillmentType === "delivery" ? areaCode.trim().toUpperCase() : undefined,
       });
@@ -100,13 +109,45 @@ export default function SmartBasketPage() {
       setBasket(result);
     } catch (cause) {
       if (axios.isAxiosError(cause)) {
-        setError(cause.response?.data?.detail || "The smart basket could not be generated.");
+        setError(cause.response?.data?.detail || (excludedListingIds.length ? "No different basket fits these choices right now." : "The smart basket could not be generated."));
       } else {
-        setError("The smart basket could not be generated.");
+        setError(excludedListingIds.length ? "No different basket fits these choices right now." : "The smart basket could not be generated.");
       }
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLockedItems(new Set());
+    void buildBasket();
+  }
+
+  function generateAnotherBasket() {
+    if (!basket) return;
+    const locked = [...lockedItems];
+    void buildBasket(basket.items.filter((item) => !lockedItems.has(item.listing_id)).map((item) => item.listing_id), locked);
+  }
+
+  function removeSuggestedItem(listingId: string) {
+    if (!basket) return;
+    const items = basket.items.filter((item) => item.listing_id !== listingId);
+    const removed = basket.items.find((item) => item.listing_id === listingId);
+    const foodTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
+    const servings = items.reduce((sum, item) => sum + item.quantity * (item.servings_per_unit || 1), 0);
+    setBasket({ ...basket, items, food_total: foodTotal, total: Math.max(0, basket.total - (removed?.subtotal || 0)), servings });
+    setLockedItems((current) => { const next = new Set(current); next.delete(listingId); return next; });
+  }
+
+  function toggleLocked(listingId: string) {
+    setLockedItems((current) => { const next = new Set(current); if (next.has(listingId)) next.delete(listingId); else next.add(listingId); return next; });
+  }
+
+  function togglePreference(option: string) {
+    const current = preferences.split(",").map((value) => value.trim()).filter(Boolean);
+    const exists = current.some((value) => value.toLowerCase() === option.toLowerCase());
+    setPreferences((exists ? current.filter((value) => value.toLowerCase() !== option.toLowerCase()) : [...current, option]).join(", "));
   }
 
   async function handleUseBasket() {
@@ -132,10 +173,11 @@ export default function SmartBasketPage() {
     setBudget("20");
     setPeople("2");
     setMeals("1");
-    setMealPurpose("Family meal");
+    setMealPurpose("Lunch");
     setPreferences("");
     setFulfillmentType("pickup");
     setAreaCode("");
+    setOptimizationMode("best_match");
     setBasket(null);
     setError("");
   }
@@ -177,7 +219,7 @@ export default function SmartBasketPage() {
             </div>
 
             <fieldset>
-              <legend className="mb-1.5 text-sm font-semibold text-[#3A2925]">Meal purpose</legend>
+              <legend className="mb-1.5 text-sm font-semibold text-[#3A2925]">What are you planning?</legend>
               <div className="flex flex-wrap gap-2">
                 {purposes.map((purpose) => (
                   <button
@@ -208,6 +250,12 @@ export default function SmartBasketPage() {
                 placeholder="e.g. vegetarian, more bakery items, no dairy"
                 className="w-full resize-none rounded-xl border border-[#EEDFD3] bg-white px-3.5 py-2.5 text-[15px] text-[#3A2925]"
               />
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Quick preferences">
+                {preferenceOptions.map((option) => {
+                  const selected = preferences.split(",").some((value) => value.trim().toLowerCase() === option.toLowerCase());
+                  return <button key={option} type="button" aria-pressed={selected} onClick={() => togglePreference(option)} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${selected ? "border-[#E85D3F] bg-[#FFF0E5] text-[#C9472E]" : "border-[#EEDFD3] text-[#71605A] hover:border-[#E85D3F]/50"}`}>{option}</button>;
+                })}
+              </div>
               <span className="mt-1 block text-xs text-[#71605A]">
                 Not a guarantee for serious allergies.
               </span>
@@ -233,6 +281,8 @@ export default function SmartBasketPage() {
                 ))}
               </div>
             </fieldset>
+
+            <label className="block"><span className="mb-1.5 block text-sm font-semibold text-[#3A2925]">Build for</span><select value={optimizationMode} onChange={(event)=>setOptimizationMode(event.target.value as typeof optimizationMode)} className={field}><option value="best_match">Best match</option><option value="lowest_price">Lowest price</option><option value="most_variety">Most variety</option></select></label>
 
             {fulfillmentType === "delivery" && (
               <label className="block">
@@ -285,7 +335,7 @@ export default function SmartBasketPage() {
                 </span>
                 <h2 className="mt-4 text-xl font-bold text-[#3A2925]">Your basket will appear here</h2>
                 <p className="mt-2 max-w-sm text-sm text-[#71605A]">
-                  Set your budget and meal, and we'll suggest items from one local business.
+                  Set your budget and meal, and we'll combine suitable items from available local businesses.
                 </p>
               </div>
             ) : (
@@ -304,6 +354,7 @@ export default function SmartBasketPage() {
                 {basket.reason && (
                   <p className="mt-4 rounded-xl bg-[#FFF9EE] px-4 py-3 text-sm text-[#71605A]">{basket.reason}</p>
                 )}
+                {basket.preference_note && <p className={`mt-3 rounded-xl px-4 py-3 text-sm ${basket.preference_note.startsWith("Some") ? "bg-amber-50 text-amber-800" : "bg-green-50 text-green-700"}`}>{basket.preference_note}</p>}
 
                 <p className="mt-4 rounded-xl border border-[#EEDFD3] bg-[#FFF0E5] px-4 py-3 text-sm font-semibold text-[#3A2925]">
                   Covers {basket.meals} meal{basket.meals === 1 ? "" : "s"} for {basket.people} people ({basket.servings} food portions).
@@ -314,11 +365,14 @@ export default function SmartBasketPage() {
                     <li key={item.listing_id} className="flex items-center justify-between gap-4 px-4 py-3">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-[#3A2925]">{item.title}</p>
+                        <p className="truncate text-xs font-medium text-[#C9472E]">{item.business_name}</p>
+                        {item.match_reason && <p className="truncate text-xs text-[#71605A]">{item.match_reason}</p>}
                         <p className="text-sm text-[#71605A]">
                           {item.quantity} × ${item.unit_price.toFixed(2)}
+                          {item.servings_per_unit && item.servings_per_unit > 1 ? ` · serves ${item.servings_per_unit * item.quantity}` : ""}
                         </p>
                       </div>
-                      <p className="shrink-0 font-bold text-[#3A2925]">${item.subtotal.toFixed(2)}</p>
+                      <div className="flex shrink-0 items-center gap-2"><p className="font-bold text-[#3A2925]">${item.subtotal.toFixed(2)}</p><button type="button" onClick={()=>toggleLocked(item.listing_id)} title={lockedItems.has(item.listing_id)?"Unlock item":"Keep item when regenerating"} className={`rounded-lg p-1.5 ${lockedItems.has(item.listing_id)?"bg-[#FFF0E5] text-[#C9472E]":"text-[#9A8981] hover:bg-[#FFF0E5]"}`}>{lockedItems.has(item.listing_id)?<Lock size={15}/>:<Unlock size={15}/>}</button><button type="button" onClick={()=>removeSuggestedItem(item.listing_id)} title="Remove item" className="rounded-lg p-1.5 text-[#9A8981] hover:bg-red-50 hover:text-red-600"><Trash2 size={15}/></button></div>
                     </li>
                   ))}
                 </ul>
@@ -328,6 +382,7 @@ export default function SmartBasketPage() {
                     <dt className="text-[#71605A]">Food</dt>
                     <dd className="font-semibold text-[#3A2925]">${basket.food_total.toFixed(2)}</dd>
                   </div>
+                  {basket.businesses?.filter((business)=>business.delivery_fee>0).map((business)=><div key={business.business_id} className="flex justify-between text-xs"><dt className="text-[#71605A]">{business.business_name} delivery</dt><dd>${business.delivery_fee.toFixed(2)}</dd></div>)}
                   <div className="flex justify-between">
                     <dt className="text-[#71605A]">Delivery</dt>
                     <dd className="font-semibold text-[#3A2925]">${basket.delivery_fee.toFixed(2)}</dd>
@@ -345,6 +400,9 @@ export default function SmartBasketPage() {
                   className="mt-5 h-12 w-full rounded-xl bg-[#E85D3F] font-semibold text-white hover:bg-[#C9472E]"
                 >
                   {addingToCart ? "Checking availability..." : "Use This Basket"}
+                </button>
+                <button type="button" onClick={generateAnotherBasket} disabled={loading || addingToCart} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#E85D3F] bg-white font-semibold text-[#C9472E] hover:bg-[#FFF0E5] disabled:cursor-not-allowed disabled:opacity-60">
+                  <RefreshCw size={17} /> Generate another basket
                 </button>
                 <button type="button" onClick={cancelBasket} className="mt-2 h-11 w-full rounded-xl border border-[#EEDFD3] font-semibold text-[#71605A] hover:border-[#E85D3F] hover:text-[#C9472E]">
                   Cancel basket

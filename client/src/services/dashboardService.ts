@@ -14,6 +14,12 @@ export interface OrderSummary {
   payment_status: string;
   total_amount: number;
   created_at?: string;
+  checkout_id?: string;
+  fulfillment_type?: "pickup" | "delivery";
+  delivery_address?: string;
+  delivery_fee?: number;
+  subtotal?: number;
+  business_name?: string;
   items?: Array<{
     listing_id: string;
     title: string;

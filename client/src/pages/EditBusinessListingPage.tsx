@@ -52,6 +52,11 @@ export default function EditBusinessListingPage() {
     donateIfUnsold: true,
     donationEligible: true,
     imageUrl: "",
+    servingsPerPackage: "1",
+    packageContents: "",
+    dietaryTags: [] as string[],
+    allergens: "",
+    suitableMeals: [] as string[],
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -100,6 +105,11 @@ export default function EditBusinessListingPage() {
           donateIfUnsold: listing.donate_if_unsold,
           donationEligible: listing.donation_eligible,
           imageUrl: listing.image_url ?? "",
+          servingsPerPackage: String(listing.servings_per_package ?? 1),
+          packageContents: listing.package_contents ?? "",
+          dietaryTags: listing.dietary_tags ?? [],
+          allergens: (listing.allergens ?? []).join(", "),
+          suitableMeals: listing.suitable_meals ?? [],
         });
 
         setImagePreview(listing.image_url ?? "");
@@ -173,15 +183,27 @@ export default function EditBusinessListingPage() {
     const originalPrice = Number(form.originalPrice);
     const discountedPrice = Number(form.discountedPrice);
     const quantity = Number(form.quantity);
+    const servingsPerPackage = Number(form.servingsPerPackage);
 
     if (
       originalPrice <= 0 ||
       discountedPrice <= 0 ||
-      quantity <= 0
+      quantity <= 0 ||
+      servingsPerPackage <= 0
     ) {
       setError(
         "Prices and quantity must be greater than zero."
       );
+      return;
+    }
+
+    if (!form.imageUrl && !imageFile) {
+      setError("Upload a clear food image before saving the listing.");
+      return;
+    }
+
+    if (!form.suitableMeals.length) {
+      setError("Choose at least one suitable meal type.");
       return;
     }
 
@@ -232,6 +254,11 @@ export default function EditBusinessListingPage() {
         donate_if_unsold: form.donateIfUnsold,
         donation_eligible: form.donationEligible,
         image_url: imageUrl,
+        servings_per_package: servingsPerPackage,
+        package_contents: form.packageContents.trim() || undefined,
+        dietary_tags: form.dietaryTags,
+        allergens: form.allergens.split(",").map((value) => value.trim()).filter(Boolean),
+        suitable_meals: form.suitableMeals,
       });
 
       navigate("/business/listings", {
@@ -360,6 +387,21 @@ export default function EditBusinessListingPage() {
 
             <label>
               <span className="mb-2 block text-sm font-semibold">
+                Servings per package
+              </span>
+              <input
+                required
+                type="number"
+                min={1}
+                max={100}
+                value={form.servingsPerPackage}
+                onChange={(event) => setForm({ ...form, servingsPerPackage: event.target.value })}
+                className={inputClass}
+              />
+            </label>
+
+            <label>
+              <span className="mb-2 block text-sm font-semibold">
                 Original price
               </span>
 
@@ -439,6 +481,38 @@ export default function EditBusinessListingPage() {
             </label>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="mb-2 block text-sm font-semibold">Package contents</span>
+              <input value={form.packageContents} onChange={(event) => setForm({ ...form, packageContents: event.target.value })} placeholder="Example: 4 cake slices" className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-semibold">Allergens</span>
+              <input value={form.allergens} onChange={(event) => setForm({ ...form, allergens: event.target.value })} placeholder="Example: milk, nuts, gluten" className={inputClass} />
+              <span className="mt-1 block text-xs text-[#71605A]">Separate allergens with commas.</span>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold">Suitable for</legend>
+            <div className="flex flex-wrap gap-2">
+              {["breakfast", "lunch", "dinner", "snacks", "gathering"].map((meal) => {
+                const selected = form.suitableMeals.includes(meal);
+                return <button key={meal} type="button" onClick={() => setForm({ ...form, suitableMeals: selected ? form.suitableMeals.filter((value) => value !== meal) : [...form.suitableMeals, meal] })} className={`rounded-full border px-3 py-1.5 text-sm capitalize ${selected ? "border-[#E85D3F] bg-[#FFF0E5] text-[#C9472E]" : "border-[#EEDFD3] text-[#71605A]"}`}>{meal}</button>;
+              })}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold">Dietary tags</legend>
+            <div className="flex flex-wrap gap-2">
+              {[["vegetarian", "Vegetarian"], ["vegan", "Vegan"], ["dairy_free", "Dairy free"], ["gluten_free", "Gluten free"], ["halal", "Halal"]].map(([value, label]) => {
+                const selected = form.dietaryTags.includes(value);
+                return <button key={value} type="button" onClick={() => setForm({ ...form, dietaryTags: selected ? form.dietaryTags.filter((tag) => tag !== value) : [...form.dietaryTags, value] })} className={`rounded-full border px-3 py-1.5 text-sm ${selected ? "border-[#E85D3F] bg-[#FFF0E5] text-[#C9472E]" : "border-[#EEDFD3] text-[#71605A]"}`}>{label}</button>;
+              })}
+            </div>
+          </fieldset>
+
           <div>
             <label className="mb-2 block text-sm font-semibold">
               Fulfillment
@@ -465,7 +539,7 @@ export default function EditBusinessListingPage() {
 
           <div>
             <label className="mb-2 block text-sm font-semibold">
-              Replace food image
+              Replace food image (required for every listing)
             </label>
 
             <input

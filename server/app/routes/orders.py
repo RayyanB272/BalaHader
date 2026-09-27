@@ -9,7 +9,8 @@ from app.database import (
     orders_collection,
     stock_holds_collection,
     delivery_areas_collection,
-    deliveries_collection
+    deliveries_collection,
+    payments_collection,
 )
 
 from app.schemas.order import (
@@ -685,6 +686,14 @@ def get_my_orders(
         order["_id"] = str(
             order["_id"]
         )
+        if not order.get("checkout_id"):
+            payment = payments_collection.find_one({"order_ids": order["_id"]}, {"checkout_id": 1})
+            if payment:
+                order["checkout_id"] = payment.get("checkout_id")
+        business_id = order.get("business_id")
+        if business_id and ObjectId.is_valid(str(business_id)):
+            business = businesses_collection.find_one({"_id": ObjectId(str(business_id))}, {"business_name": 1})
+            order["business_name"] = business.get("business_name", "Business") if business else "Business"
 
     return orders
 

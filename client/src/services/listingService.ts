@@ -14,6 +14,11 @@ export interface Listing {
   fulfillment_type?: "pickup" | "delivery" | "both";
   average_rating?: number;
   review_count?: number;
+  servings_per_package?: number;
+  package_contents?: string;
+  dietary_tags?: string[];
+  allergens?: string[];
+  suitable_meals?: string[];
   business: {
     business_id: string;
     business_name: string;

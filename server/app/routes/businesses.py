@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
+from bson import ObjectId
 
 from app.database import (
     businesses_collection,
@@ -242,6 +243,42 @@ def get_delivery_areas(
         area["_id"] = str(area["_id"])
 
     return areas
+
+
+@router.get("/{business_id}/delivery-areas")
+def get_public_delivery_areas(business_id: str):
+    if not ObjectId.is_valid(business_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid business ID"
+        )
+
+    business = businesses_collection.find_one({
+        "_id": ObjectId(business_id),
+        "status": "active",
+        "delivery_enabled": True
+    })
+
+    if not business:
+        return []
+
+    areas = list(
+        delivery_areas_collection.find({
+            "business_id": business_id,
+            "is_active": True
+        }).sort("area_name", 1)
+    )
+
+    return [
+        {
+            "_id": str(area["_id"]),
+            "area_code": area.get("area_code"),
+            "area_name": area.get("area_name"),
+            "delivery_fee": float(area.get("delivery_fee", 0)),
+            "estimated_time_minutes": area.get("estimated_time_minutes")
+        }
+        for area in areas
+    ]
 
 @router.get("/insights/unsold-items")
 def get_unsold_items_insights(

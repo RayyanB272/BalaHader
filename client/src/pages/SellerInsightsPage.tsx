@@ -1,22 +1,17 @@
-import { type FormEvent, useState } from "react";
-import axios from "axios";
+import { type FormEvent, useSyncExternalStore } from "react";
 import {
   BarChart3,
   Sparkles,
   TrendingDown,
 } from "lucide-react";
 import DashboardShell from "../components/layout/DashboardShell";
-import {
-  generateSellerInsights,
-  type SellerInsightsResponse,
-} from "../services/sellerInsightsService";
+import { sellerInsightsStore } from "../services/sellerInsightsStore";
 
 export default function SellerInsightsPage() {
-  const [days, setDays] = useState("30");
-  const [result, setResult] =
-    useState<SellerInsightsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { days, result, loading, error } = useSyncExternalStore(
+    sellerInsightsStore.subscribe,
+    sellerInsightsStore.getSnapshot
+  );
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -30,34 +25,11 @@ export default function SellerInsightsPage() {
       numericDays < 1 ||
       numericDays > 365
     ) {
-      setError("Choose a period between 1 and 365 days.");
+      sellerInsightsStore.setError("Choose a period between 1 and 365 days.");
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const insight = await generateSellerInsights(
-        numericDays
-      );
-
-      setResult(insight);
-    } catch (cause) {
-      if (axios.isAxiosError(cause)) {
-        setError(
-          cause.response?.data?.detail ||
-            "Seller insights could not be generated."
-        );
-      } else {
-        setError(
-          "Seller insights could not be generated."
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+    void sellerInsightsStore.analyze(numericDays);
   }
 
   return (
@@ -95,7 +67,7 @@ export default function SellerInsightsPage() {
               <select
                 value={days}
                 onChange={(event) =>
-                  setDays(event.target.value)
+                  sellerInsightsStore.setDays(event.target.value)
                 }
                 className="w-full rounded-xl border border-[#EEDFD3] bg-white px-4 py-3 text-sm outline-none focus:border-[#E85D3F]"
               >
