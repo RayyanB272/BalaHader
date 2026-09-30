@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Clock3, MapPin, Star, X } from "lucide-react";
-import { getListings, type Listing } from "../services/listingService";
+import { getListing, getListings, type Listing } from "../services/listingService";
+import { addToCart } from "../services/cartService";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorState from "../components/ui/ErrorState";
 import PageFrame from "../components/layout/PageFrame";
@@ -35,6 +36,7 @@ function deadlineLabel(value?: string) {
 }
 
 export default function BrowseFood() {
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [listings, setListings] = useState<Listing[]>([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +48,22 @@ export default function BrowseFood() {
     const [submittedMaxPrice, setSubmittedMaxPrice] = useState("");
     const [sort, setSort] = useState("default");
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+    const [addingToCart, setAddingToCart] = useState(false);
+    const [cartMessage, setCartMessage] = useState("");
+
+    async function handleAddToCart(listing: Listing) {
+        if (localStorage.getItem("role") !== "customer") {
+            navigate(`/login?next=${encodeURIComponent(`/browse`)}`);
+            return;
+        }
+        setAddingToCart(true); setCartMessage("");
+        try {
+            addToCart(await getListing(listing._id));
+            setCartMessage("Added to cart.");
+        } catch (cause) {
+            setCartMessage(cause instanceof Error ? cause.message : "Could not add this item to the cart.");
+        } finally { setAddingToCart(false); }
+    }
 
     useEffect(() => {
         if (!selectedListing) return;
@@ -221,7 +239,7 @@ export default function BrowseFood() {
             ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {sortedListings.map((listing) => (
-                        <button key={listing._id} type="button" onClick={() => setSelectedListing(listing)} className="text-left">
+                        <button key={listing._id} type="button" onClick={() => { setSelectedListing(listing); setCartMessage(""); }} className="text-left">
                             <article className="overflow-hidden rounded-2xl border border-[#EEDFD3] bg-white shadow-sm transition-shadow hover:shadow-md">
                                 {listing.image_url ? (
                                     <img
@@ -302,7 +320,13 @@ export default function BrowseFood() {
               {selectedListing.image_url ? <img src={selectedListing.image_url} alt={selectedListing.title} className="h-52 w-full rounded-2xl object-cover" /> : <div className="flex h-52 items-center justify-center rounded-2xl bg-[#FFF0E5]"><BrandIcon size="lg" /></div>}
               <div className="mt-5 flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-[#E85D3F]">{selectedListing.category.replaceAll("_", " ")}</p><h2 id="customer-listing-title" className="mt-1 text-2xl font-bold text-[#3A2925]">{selectedListing.title}</h2><p className="mt-1 text-sm text-[#71605A]">{selectedListing.business.business_name}{selectedListing.business.area ? ` · ${selectedListing.business.area}` : ""}</p></div><span className="shrink-0 rounded-full bg-[#FFF0E5] px-3 py-1 text-xs font-semibold text-[#C9472E]">{selectedListing.available_quantity} available</span></div>
               <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[#FFF9EE] p-4 text-sm"><div><p className="text-xs text-[#71605A]">Price</p><p className="mt-1 font-bold text-[#C9472E]">${selectedListing.discounted_price.toFixed(2)}</p></div><div><p className="text-xs text-[#71605A]">Fulfillment</p><p className="mt-1 font-semibold capitalize">{selectedListing.fulfillment_type?.replaceAll("_", " ") || "Pickup"}</p></div><div><p className="text-xs text-[#71605A]">Rating</p><p className="mt-1 font-semibold">{selectedListing.review_count ? `${selectedListing.average_rating} / 5` : "New listing"}</p></div><div><p className="text-xs text-[#71605A]">Deadline</p><p className="mt-1 font-semibold">{selectedListing.sale_deadline ? new Date(selectedListing.sale_deadline).toLocaleDateString() : "Not specified"}</p></div></div>
-              <Link to={`/food/${selectedListing._id}`} className="mt-5 block w-full rounded-xl bg-[#E85D3F] px-5 py-3 text-center text-sm font-semibold text-white hover:bg-[#C9472E]">View full details and order</Link>
+              {cartMessage && <p role="status" className={`mt-4 text-sm font-semibold ${cartMessage === "Added to cart." ? "text-green-700" : "text-red-700"}`}>{cartMessage}{cartMessage === "Added to cart." && <> <Link to="/cart" className="underline">View cart</Link></>}</p>}
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <Link to={`/food/${selectedListing._id}`} className="rounded-xl border border-[#E85D3F] px-4 py-3 text-center text-sm font-semibold text-[#C9472E] transition hover:bg-[#FFF0E5]">Full details</Link>
+                <button type="button" disabled={addingToCart || selectedListing.available_quantity <= 0} onClick={() => void handleAddToCart(selectedListing)} className="rounded-xl bg-[#E85D3F] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#C9472E] disabled:cursor-not-allowed disabled:opacity-50">
+                  {selectedListing.available_quantity <= 0 ? "Sold out" : addingToCart ? "Adding..." : localStorage.getItem("role") === "customer" ? "Add to cart" : "Sign in to order"}
+                </button>
+              </div>
             </article>
           </div>, document.body
         )}

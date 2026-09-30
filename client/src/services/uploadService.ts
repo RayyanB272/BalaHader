@@ -14,7 +14,12 @@ export async function uploadFoodImage(
 
   const response = await api.post<FoodImageUploadResponse>(
     "/uploads/food-image",
-    formData
+    formData,
+    {
+      // Override the JSON default used by the shared API client. Axios adds
+      // the multipart boundary automatically in the browser.
+      headers: { "Content-Type": "multipart/form-data" },
+    }
   );
 
   return response.data;
@@ -27,7 +32,10 @@ export async function uploadVerificationDocument(
   formData.append("file", file);
   const response = await api.post<FoodImageUploadResponse>(
     "/uploads/verification-document",
-    formData
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
   );
   return response.data;
 }

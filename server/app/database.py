@@ -1,7 +1,14 @@
 from pymongo import MongoClient
 from app.config import settings
 
-client = MongoClient(settings.MONGODB_URL)
+if settings.TESTING:
+    # Tests must never wait for or write to a developer's real MongoDB.
+    # mongomock is intentionally a test-only dependency.
+    import mongomock
+
+    client = mongomock.MongoClient()
+else:
+    client = MongoClient(settings.MONGODB_URL)
 
 db = client[settings.DATABASE_NAME]
 

@@ -22,8 +22,8 @@ def _generate_with_ollama(
         "keep_alive": "10m",
         "options": {
             "temperature": 0.15,
-            "num_ctx": 2048,
-            "num_predict": 320,
+            "num_ctx": 1536,
+            "num_predict": 180,
         },
     }
 
@@ -40,7 +40,10 @@ def _generate_with_ollama(
     )
 
     try:
-        with urlopen(request, timeout=30) as response:
+        with urlopen(
+            request,
+            timeout=settings.OLLAMA_TIMEOUT_SECONDS,
+        ) as response:
             response_data = json.loads(
                 response.read().decode("utf-8")
             )

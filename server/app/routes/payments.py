@@ -8,6 +8,7 @@ from fastapi import (
 )
 
 from bson import ObjectId
+from pymongo import ReturnDocument
 from datetime import datetime, timezone
 
 from app.config import settings
@@ -24,6 +25,7 @@ from app.schemas.payment import PaymentIntentRequest, BatchPaymentIntentRequest
 from app.utils.dependencies import require_role
 from app.services.stock_hold_service import release_hold
 from app.services.notification_service import create_notification
+from app.services.transaction_service import run_transaction, session_options
 
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -36,29 +38,101 @@ router = APIRouter(
 
 
 def _commit_order_payment(order, now):
-    order_id = str(order["_id"])
     hold_id = order.get("stock_hold_id")
-    hold = stock_holds_collection.find_one({"_id": ObjectId(hold_id), "status": "active"}) if hold_id and ObjectId.is_valid(hold_id) else None
-
-    if not hold:
-        orders_collection.update_one({"_id": order["_id"]}, {"$set": {"payment_status": "paid_late", "order_status": "reconciliation_required", "reconciliation_reason": "Payment succeeded but stock hold is no longer active", "updated_at": now}})
-        return False
-
-    expires_at = hold.get("expires_at")
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at and expires_at <= now:
-        release_hold(hold_id, final_status="expired")
-        orders_collection.update_one({"_id": order["_id"]}, {"$set": {"payment_status": "paid_late", "order_status": "reconciliation_required", "reconciliation_reason": "Payment succeeded after stock hold expired", "updated_at": now}})
-        return False
-
-    for item in hold["items"]:
-        listings_collection.update_one(
-            {"_id": ObjectId(item["listing_id"])},
-            {"$inc": {"reserved_quantity": -item["quantity"], "remaining_quantity": -item["quantity"], "quantity_sold": item["quantity"]}, "$set": {"updated_at": now}}
+    if not hold_id or not ObjectId.is_valid(hold_id):
+        orders_collection.update_one(
+            {"_id": order["_id"]},
+            {"$set": {"payment_status": "paid_late", "order_status": "reconciliation_required", "reconciliation_reason": "Payment succeeded without a valid stock hold", "updated_at": now}},
         )
-    stock_holds_collection.update_one({"_id": ObjectId(hold_id)}, {"$set": {"status": "committed", "committed_at": now, "updated_at": now}})
-    orders_collection.update_one({"_id": order["_id"]}, {"$set": {"payment_status": "paid", "order_status": "confirmed", "updated_at": now}})
+        return False
+
+    def commit(session):
+        options = session_options(session)
+        hold = stock_holds_collection.find_one_and_update(
+            {"_id": ObjectId(hold_id), "status": "active"},
+            {"$set": {"status": "committing", "updated_at": now}},
+            return_document=ReturnDocument.AFTER,
+            **options,
+        )
+        if not hold:
+            return False
+
+        expires_at = hold.get("expires_at")
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at and expires_at <= now:
+            for item in hold["items"]:
+                listings_collection.update_one(
+                    {"_id": ObjectId(item["listing_id"])},
+                    {"$inc": {"reserved_quantity": -item["quantity"]}, "$set": {"updated_at": now}},
+                    **options,
+                )
+            stock_holds_collection.update_one(
+                {"_id": ObjectId(hold_id), "status": "committing"},
+                {"$set": {"status": "expired", "released_at": now, "updated_at": now}},
+                **options,
+            )
+            return False
+
+        updated_items = []
+        for item in hold["items"]:
+            quantity = item["quantity"]
+            result = listings_collection.update_one(
+                {
+                    "_id": ObjectId(item["listing_id"]),
+                    "reserved_quantity": {"$gte": quantity},
+                    "remaining_quantity": {"$gte": quantity},
+                },
+                {
+                    "$inc": {
+                        "reserved_quantity": -quantity,
+                        "remaining_quantity": -quantity,
+                        "quantity_sold": quantity,
+                    },
+                    "$set": {"updated_at": now},
+                },
+                **options,
+            )
+            if result.modified_count != 1:
+                if session is None:
+                    for updated in updated_items:
+                        listings_collection.update_one(
+                            {"_id": ObjectId(updated["listing_id"])},
+                            {"$inc": {"reserved_quantity": updated["quantity"], "remaining_quantity": updated["quantity"], "quantity_sold": -updated["quantity"]}},
+                        )
+                    stock_holds_collection.update_one(
+                        {"_id": ObjectId(hold_id), "status": "committing"},
+                        {"$set": {"status": "active", "updated_at": now}},
+                    )
+                    return False
+                raise RuntimeError("Stock changed while payment was being committed")
+            updated_items.append(item)
+
+        stock_holds_collection.update_one(
+            {"_id": ObjectId(hold_id), "status": "committing"},
+            {"$set": {"status": "committed", "committed_at": now, "updated_at": now}},
+            **options,
+        )
+        orders_collection.update_one(
+            {"_id": order["_id"]},
+            {"$set": {"payment_status": "paid", "order_status": "confirmed", "updated_at": now}},
+            **options,
+        )
+        return True
+
+    try:
+        committed = run_transaction(commit)
+    except RuntimeError:
+        committed = False
+
+    if not committed:
+        orders_collection.update_one(
+            {"_id": order["_id"], "payment_status": {"$ne": "paid"}},
+            {"$set": {"payment_status": "paid_late", "order_status": "reconciliation_required", "reconciliation_reason": "Payment succeeded but reserved stock could not be committed", "updated_at": now}},
+        )
+        return False
+
     create_notification(user_id=order["customer_id"], notification_type="order_confirmed", title="Order Confirmed", message="Your combined payment was successful and this order has been confirmed.")
     return True
 
@@ -224,6 +298,33 @@ async def stripe_webhook(
                     payments_collection.update_one({"_id": payment["_id"]}, {"$set": {"status": "succeeded" if all_committed else "succeeded_late", "updated_at": now}})
                     payment_events_collection.update_one({"stripe_event_id": event_id}, {"$set": {"status": "processed", "processed_at": now, "updated_at": now}})
                     return {"status": "success" if all_committed else "reconciliation_required"}
+
+            # Single-order payments use the same transactional commit path as
+            # combined checkouts. Returning here also keeps webhook retries
+            # idempotent through the atomic hold-state transition.
+            single_order_id = intent["metadata"].get("order_id")
+            if single_order_id and ObjectId.is_valid(single_order_id):
+                order = orders_collection.find_one({"_id": ObjectId(single_order_id)})
+                now = datetime.now(timezone.utc)
+                committed = bool(order) and (
+                    order.get("payment_status") == "paid"
+                    or _commit_order_payment(order, now)
+                )
+                payments_collection.update_one(
+                    {"stripe_payment_intent_id": intent["id"]},
+                    {"$set": {"status": "succeeded" if committed else "succeeded_late", "updated_at": now}},
+                )
+                payment_events_collection.update_one(
+                    {"stripe_event_id": event_id},
+                    {"$set": {"status": "processed", "processed_at": now, "updated_at": now}},
+                )
+                return {"status": "success" if committed else "reconciliation_required"}
+
+            payment_events_collection.update_one(
+                {"stripe_event_id": event_id},
+                {"$set": {"status": "processed", "processed_at": datetime.now(timezone.utc)}},
+            )
+            return {"status": "ignored"}
 
             order_id = intent[
                 "metadata"

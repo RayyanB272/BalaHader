@@ -36,10 +36,9 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 
 export default function Footer() {
   const location = useLocation();
-  const token = localStorage.getItem("access_token");
   const storedRole = localStorage.getItem("role");
   const role =
-    token && ["customer", "business", "charity", "admin"].includes(storedRole ?? "")
+    ["customer", "business", "charity", "admin"].includes(storedRole ?? "")
       ? (storedRole as Role)
       : null;
 

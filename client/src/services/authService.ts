@@ -1,4 +1,5 @@
 import api from "./api";
+import { clearSession } from "./sessionService";
 
 export interface LoginData {
   email: string;
@@ -67,9 +68,7 @@ export const logout = async () => {
   try {
     await api.post("/auth/logout");
   } finally {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("balahader_user_name");
+    clearSession();
   }
 };
 

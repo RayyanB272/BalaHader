@@ -55,9 +55,9 @@ const roleLinks: Record<Role, Item[]> = {
     { to: "/charity/settings", label: "Charity profile", icon: Settings },
   ],
   admin: [
-    { to: "/admin/charities", label: "Charity verification", icon: ShieldCheck },
-    { to: "/admin/users", label: "User management", icon: UsersRound },
-    { to: "/admin/businesses", label: "Businesses", icon: Building2 },
+    { to: "/admin/charities", label: "Charity verifications", icon: ShieldCheck },
+    { to: "/admin/users", label: "User managements", icon: UsersRound },
+    { to: "/admin/businesses", label: "Business managements", icon: Building2 },
     { to: "/admin/listings", label: "Listing moderation", icon: PackageSearch },
     { to: "/admin/orders", label: "Order management", icon: ReceiptText },
     { to: "/admin/donations", label: "Donation management", icon: HeartHandshake },

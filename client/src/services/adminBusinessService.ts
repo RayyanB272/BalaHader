@@ -9,6 +9,7 @@ export interface AdminBusiness {
   address: string;
   area: string;
   delivery_enabled?: boolean;
+  user_status?: "active" | "suspended" | "unknown";
   created_at: string;
   updated_at?: string;
 }

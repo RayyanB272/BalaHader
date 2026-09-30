@@ -87,7 +87,6 @@ export default function PublicHeader() {
   }
 
   const role = localStorage.getItem("role");
-  const token = localStorage.getItem("access_token");
 
   const validRole =
     role === "customer" ||
@@ -95,8 +94,8 @@ export default function PublicHeader() {
     role === "charity" ||
     role === "admin";
 
-  const dashboardPath = token && validRole ? `/${role}` : null;
-  const visibleNavLinks = token && role === "customer"
+  const dashboardPath = validRole ? `/${role}` : null;
+  const visibleNavLinks = role === "customer"
     ? [
         { to: "/customer", label: "Home" },
         { to: "/browse", label: "Browse Food" },

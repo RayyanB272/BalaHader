@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from bson import ObjectId
@@ -7,13 +7,25 @@ from app.config import settings
 from app.database import users_collection
 
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security)
 ):
-    token = credentials.credentials
+    token = request.cookies.get("access_token")
+
+    # Bearer support is retained for API clients, while the browser uses the
+    # HttpOnly cookie so JavaScript never needs access to the token.
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
 
     try:
         payload = jwt.decode(
@@ -44,6 +56,12 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Your session is no longer valid. Please sign in again."
+        )
+
+    if user.get("status", "active") != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been suspended."
         )
 
     user["_id"] = str(user["_id"])

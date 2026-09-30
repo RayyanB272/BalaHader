@@ -20,6 +20,7 @@ from app.services.ai_service import (
     generate_seller_insight,
     generate_smart_basket
 )
+from app.services import smart_basket_builder
 
 from bson import ObjectId
 
@@ -36,6 +37,28 @@ PURPOSE_CATEGORIES = {
     "snacks": {"snacks": 5, "desserts": 4, "drinks": 3, "bakery": 2},
     "gathering": {"prepared_meals": 4, "bakery": 3, "desserts": 3, "snacks": 2, "drinks": 2},
 }
+
+
+def build_fallback_seller_insight(stats, days):
+    """Return a useful insight without making the dashboard depend on Ollama."""
+    offered = sum(item.get("total_offered", 0) for item in stats)
+    sold = sum(item.get("total_sold", 0) for item in stats)
+    unsold = sum(item.get("total_unsold", 0) for item in stats)
+    sell_through = round((sold / offered) * 100, 1) if offered else 0
+    top_item = max(stats, key=lambda item: item.get("total_sold", 0), default=None)
+    top_title = top_item.get("title") if top_item else "your listings"
+
+    lines = [
+        f"Based on {len(stats)} listing types over the last {days} days, "
+        f"you offered {offered} items and sold {sold} ({sell_through}% sell-through).",
+    ]
+    if top_item:
+        lines.append(f"{top_title} was the strongest seller with {top_item.get('total_sold', 0)} sold.")
+    if unsold:
+        lines.append(f"There were {unsold} unsold items; consider smaller batches or earlier discounts for slower listings.")
+    else:
+        lines.append("All recorded items sold, so keeping similar quantities available may work well.")
+    return " ".join(lines)
 
 PREFERENCE_KEYWORDS = {
     "bakery": ("bakery", "bread", "croissant", "manakish", "pastry"),
@@ -181,6 +204,15 @@ def basket_match_score(basket, businesses, meal_purpose, preferences):
     return score
 
 
+# Keep the route focused on request validation and persistence. The matching
+# engine lives in a standalone service so it can be tested without FastAPI.
+requested_categories = smart_basket_builder.requested_categories
+infer_servings = smart_basket_builder.infer_servings
+flatten_candidates = smart_basket_builder.flatten_candidates
+build_reliable_basket = smart_basket_builder.build_reliable_basket
+basket_match_score = smart_basket_builder.basket_match_score
+
+
 @router.post("/seller-insights")
 def seller_insights(
     data: SellerInsightsRequest,
@@ -290,11 +322,10 @@ def seller_insights(
             stats=stats,
             days=data.days
         )
-    except RuntimeError as error:
-        raise HTTPException(
-            status_code=503,
-            detail=str(error)
-        ) from error
+    except RuntimeError:
+        # Ollama is optional. Keep the insights page useful when it is slow,
+        # stopped, or unavailable by using the real statistics above.
+        insight = build_fallback_seller_insight(stats, data.days)
 
     return {
         "date_range_days": data.days,
@@ -379,8 +410,32 @@ def smart_basket(data: SmartBasketRequest, current_user=Depends(require_role("cu
         "optimization_mode": data.optimization_mode,
         "locked_listing_ids": data.locked_listing_ids,
     }
+
+    # A small, relevant catalog keeps local models responsive. The complete
+    # catalog remains available to the deterministic validator below, so the
+    # returned basket is always stock-safe and can still cover the request.
+    shortlisted_ids = {
+        item["listing_id"]
+        for item in flatten_candidates(
+            business_options,
+            data.meal_purpose,
+            data.preferences or "",
+            data.optimization_mode,
+        )[:14]
+    }
+    shortlisted_ids.update(data.locked_listing_ids or [])
+    ai_options = []
+    for business in business_options:
+        listings = [
+            listing
+            for listing in business["listings"]
+            if listing["listing_id"] in shortlisted_ids
+        ]
+        if listings:
+            ai_options.append({**business, "listings": listings})
+
     try:
-        basket = json.loads(generate_smart_basket(request_data, business_options))
+        basket = json.loads(generate_smart_basket(request_data, ai_options))
     except (RuntimeError, json.JSONDecodeError):
         basket = reliable
 

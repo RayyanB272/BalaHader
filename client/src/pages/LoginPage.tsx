@@ -4,6 +4,7 @@ import { isAxiosError } from "axios";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, TriangleAlert } from "lucide-react";
 import AuthLayout from "../components/layout/AuthLayout";
 import { login } from "../services/authService";
+import { saveSession } from "../services/sessionService";
 
 const inputClass =
   "h-12 w-full rounded-xl border border-[#EEDFD3] bg-white pl-11 pr-4 text-[15px] text-[#3A2925]";
@@ -28,9 +29,7 @@ function LoginPage() {
       setError("");
 
       const data = await login({ email: email.trim().toLowerCase(), password });
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("role", data.role);
-      localStorage.setItem("balahader_user_name", JSON.stringify({ first_name: data.first_name, last_name: data.last_name }));
+      saveSession(data.role, data.first_name, data.last_name);
 
       if (["customer", "business", "charity", "admin"].includes(data.role)) {
         const requestedNext = searchParams.get("next");

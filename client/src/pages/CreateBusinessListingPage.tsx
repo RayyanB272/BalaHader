@@ -126,7 +126,7 @@ export default function CreateBusinessListingPage() {
         uploadedImageUrl = uploadResult.image_url;
       }
 
-      await createBusinessListing({
+      const createdListing = await createBusinessListing({
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         category: form.category,
@@ -146,7 +146,12 @@ export default function CreateBusinessListingPage() {
         suitable_meals: form.suitableMeals,
       });
 
-      navigate("/business/listings");
+      if (!createdListing.listing_id) {
+        throw new Error("The listing was not created.");
+      }
+
+      // Only leave the form after the server confirms the listing exists.
+      navigate("/business/listings", { replace: true });
     } catch (cause) {
       if (isAxiosError(cause)) {
         setError(

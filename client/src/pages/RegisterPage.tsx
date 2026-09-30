@@ -20,6 +20,7 @@ import {
   login,
   register,
 } from "../services/authService";
+import { saveSession } from "../services/sessionService";
 import { uploadVerificationDocument } from "../services/uploadService";
 
 type Role = "customer" | "business" | "charity";
@@ -166,8 +167,7 @@ function RegisterPage() {
           role,
         });
         const auth = await login({ email, password });
-        localStorage.setItem("access_token", auth.access_token);
-        localStorage.setItem("role", auth.role);
+        saveSession(auth.role, auth.first_name, auth.last_name);
         setAccountCreated(true);
       }
 

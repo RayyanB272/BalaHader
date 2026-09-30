@@ -17,6 +17,7 @@ from app.routes.notifications import router as notifications_router
 from app.routes.ai import router as ai_router
 from app.routes.public import router as public_router
 from app.routes.reviews import router as reviews_router
+from app.config import settings
 
 app = FastAPI(
     title="BalaHader API",
@@ -25,10 +26,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-    ],
+    allow_origins=list(dict.fromkeys([
+        settings.FRONTEND_URL.rstrip("/"),
+        *(
+            ["http://localhost:5173", "http://127.0.0.1:5173"]
+            if settings.ENVIRONMENT.lower() != "production"
+            else []
+        ),
+    ])),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

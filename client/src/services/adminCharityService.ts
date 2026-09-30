@@ -10,6 +10,7 @@ export interface AdminCharity {
   area: string;
   verification_document_url?: string;
   verification_status: "pending" | "verified" | "rejected";
+  user_status?: "active" | "suspended" | "unknown";
   verification_reason?: string;
   verified_at?: string | null;
   created_at: string;

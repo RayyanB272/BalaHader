@@ -114,7 +114,7 @@ export default function FoodDetails() {
                         type="button"
                         disabled={available <= 0}
                         onClick={() => {
-                            if (!localStorage.getItem("access_token") || localStorage.getItem("role") !== "customer") {
+                            if (localStorage.getItem("role") !== "customer") {
                                 navigate(`/login?next=${encodeURIComponent(`/food/${listing._id}`)}`);
                                 return;
                             }

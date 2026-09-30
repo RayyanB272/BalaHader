@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
+import { getSessionRole } from "../services/sessionService";
 
 type Role = "customer" | "business" | "charity" | "admin";
 
@@ -14,12 +15,7 @@ export default function ProtectedRoute({
   allowedRole,
   allowedRoles,
 }: ProtectedRouteProps) {
-  const token = localStorage.getItem("access_token");
-  const role = localStorage.getItem("role") as Role | null;
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  const role = getSessionRole() as Role | null;
 
   if (!role) {
     return <Navigate to="/login?reason=expired" replace />;

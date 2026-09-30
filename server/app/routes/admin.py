@@ -18,6 +18,7 @@ from app.utils.dependencies import require_role
 
 from app.config import settings
 from app.database import payments_collection
+from app.services.transaction_service import run_transaction, session_options
 
 router = APIRouter(
     prefix="/admin",
@@ -200,6 +201,8 @@ def get_all_businesses(
 
     for business in businesses:
         business["_id"] = str(business["_id"])
+        owner = users_collection.find_one({"_id": ObjectId(business["user_id"])}) if ObjectId.is_valid(str(business.get("user_id", ""))) else None
+        business["user_status"] = owner.get("status", "active") if owner else "unknown"
 
     return businesses
 
@@ -381,6 +384,8 @@ def get_all_charities(
         charity["_id"] = str(
             charity["_id"]
         )
+        owner = users_collection.find_one({"_id": ObjectId(charity["user_id"])}) if ObjectId.is_valid(str(charity.get("user_id", ""))) else None
+        charity["user_status"] = owner.get("status", "active") if owner else "unknown"
 
     return charities
 
@@ -540,35 +545,32 @@ def refund_order(
 
     now = datetime.now(timezone.utc)
 
-    orders_collection.update_one(
-        {
-            "_id": ObjectId(order_id)
-        },
-        {
-            "$set": {
+    def record_refund(session):
+        options = session_options(session)
+        orders_collection.update_one(
+            {"_id": ObjectId(order_id)},
+            {"$set": {
                 "payment_status": "refunded",
                 "order_status": "cancelled",
                 "reconciliation_status": "refunded",
                 "refunded_at": now,
                 "stripe_refund_id": refund.id,
-                "updated_at": now
-            }
-        }
-    )
-
-    payments_collection.update_one(
-        {
-            "_id": payment["_id"]
-        },
-        {
-            "$set": {
+                "updated_at": now,
+            }},
+            **options,
+        )
+        payments_collection.update_one(
+            {"_id": payment["_id"]},
+            {"$set": {
                 "status": "partially_refunded" if payment.get("order_ids") else "refunded",
                 "stripe_refund_id": refund.id,
                 "refunded_at": now,
-                "updated_at": now
-            }
-        }
-    )
+                "updated_at": now,
+            }},
+            **options,
+        )
+
+    run_transaction(record_refund)
 
     return {
         "message": "Refund completed successfully",

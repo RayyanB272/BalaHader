@@ -10,6 +10,7 @@ import {
 import PageFrame from "../components/layout/PageFrame";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import { createCombinedPaymentIntent, createPaymentIntent } from "../services/orderService";
+import { clearCart } from "../services/cartService";
 
 const stripePromise = loadStripe(
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -41,6 +42,10 @@ function PaymentForm({ resultTarget }: { resultTarget: string }) {
       setError(result.error.message || "Payment could not be completed.");
       setProcessing(false);
       return;
+    }
+
+    if (result.paymentIntent?.status === "succeeded") {
+      clearCart();
     }
 
     window.location.href = resultTarget;
